@@ -72,14 +72,3 @@
 | QY_Lss | Quantum yield under stabilized light conditions. |
 | QY_D1 | Quantum yield during dark recovery phase 1. |
 | QY_D2 | Quantum yield during dark recovery phase 2. |
-
-## Derived Dashboard CSV (`fluorescence_pin_2023.csv`)
-
-| Column Name | Description |
-|---|---|
-| site | Field site identifier (PIN). |
-| year | Measurement year. |
-| date | Date of measurement (YYYY-MM-DD). |
-| QY_max | Daily mean maximum quantum yield of PSII. |
-| NPQ_Lss | Daily mean non-photochemical quenching under stabilized light. |
-| n_measurements | Number of tree-level measurements aggregated per day. |

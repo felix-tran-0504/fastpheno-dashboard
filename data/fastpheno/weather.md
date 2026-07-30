@@ -31,7 +31,7 @@ Daily weather records from Environment and Climate Change Canada (ECCC) stations
 | mean_distance | Mean distance to contributing stations (km). |
 | site_lat | Field site latitude (°). |
 | site_lon | Field site longitude (°). |
-| vpd | Daily mean vapor pressure deficit (kPa). **Excluded from dashboard filters.** |
+| vpd | Daily mean vapor pressure deficit (kPa). |
 | temp_interp | Interpolated mean temperature (°C). |
 | wind_spd_interp | Interpolated wind speed (km/h). |
 
@@ -39,4 +39,3 @@ Daily weather records from Environment and Climate Change Canada (ECCC) stations
 
 - Source path: `Weather/ECCC/{PIK,PIN}/Daily/*_daily_2010-2024.csv`
 - Missing numeric values are encoded as `NA` in the source files.
-- VPD is present in the source CSV but omitted from dashboard metric filters and table columns.

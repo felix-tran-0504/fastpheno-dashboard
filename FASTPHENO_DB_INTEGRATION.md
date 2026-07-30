@@ -1,10 +1,10 @@
 # FastPheno (III_db_final) Integration Plan
 
-This document outlines concrete approaches for integrating the FastPheno plant physiology database at `/Users/felixtran/Downloads/III_db_final` into the existing BAR-style static HTML shell at `PCA_C-SPIRIT Single Cell Papers.html`.
+This document outlines concrete approaches for integrating the FastPheno plant physiology database at `/Users/felixtran/Downloads/III_db_final` into the BAR-style static HTML dashboard at [`fastpheno-dashboard.html`](./fastpheno-dashboard.html).
 
 **Context:** III_db_final is a folder-based database (~215 files) spanning weather, reflectance, fluorescence, predawn water potential, and pressure–volume (TLP) curves across two field sites (Pickering/PIK, Pintendre/PIN) and multiple years (2010–2024 for weather; 2022–2024 for most phenotyping).
 
-A working proof-of-concept dashboard already exists at [`fastpheno-dashboard.html`](./fastpheno-dashboard.html), backed by minimal derived CSVs in [`data/fastpheno/`](./data/fastpheno/).
+The primary app is [`fastpheno-dashboard.html`](./fastpheno-dashboard.html), backed by derived CSVs in [`data/fastpheno/`](./data/fastpheno/).
 
 ---
 
@@ -13,39 +13,39 @@ A working proof-of-concept dashboard already exists at [`fastpheno-dashboard.htm
 | Domain | Source path(s) | Browser-friendly? | Best viz types |
 |--------|----------------|-------------------|----------------|
 | **Weather** | `Weather/ECCC/{PIK,PIN}/Daily/*_daily_2010-2024.csv` | Yes — ~5.5k rows/site, ~20 cols | Time series (temp, precip, VPD), seasonal aggregates |
-| **Reflectance** | `Reflectance/{site}/{year}/UNS_*.csv` | Partial — 600+ wavelength cols; **use index cols only** (NDVI, PRI, GNDVI, etc.) | Time series, genotype boxplots |
-| **Fluorescence** | `Fluorescence/{site}/FLP_*.csv` | Yes — ~700 rows/year, ~65 cols | Time series (QY_max, NPQ_Lss), scatter vs WP |
+| **Reflectance** | `Reflectance/{site}/{year}/UNS_*.csv` | Partial — raw campaign files are wide (hundreds of spectral cols) but still usable if filtered to key metrics in the UI | Time series, genotype boxplots |
+| **Fluorescence** | `Fluorescence/{site}/FLP_*.csv` | Yes — raw campaign rows are browser-friendly | Time series (QY_max, NPQ_Lss), scatter vs WP |
 | **Predawn WP** | `PredawnWaterPotential/Process/SPC_PreWP_2023.csv` | Yes — ~530 rows | Boxplot by cluster/genotype, scatter over season |
 | **TLP (P–V curves)** | `Tlp/**/pv_parameters_clean*.csv` | Moderate — multiple R-output files, needs consolidation | Parameter tables (Ψ<sub>tlp</sub>, RWC<sub>tlp</sub>), curve overlays |
 
 ---
 
-## Approach 1: Static CSV + Tabulator (same pattern as papers table)
+## Approach 1: Static CSV + Tabulator (current pattern)
 
-**Description:** Pre-process III_db_final into flat, browser-sized CSVs. Load them with PapaParse + Tabulator (and Chart.js for plots), exactly as `papers.csv` powers the existing papers table.
+**Description:** Pre-process III_db_final into flat, browser-sized CSVs. Load them with PapaParse + Tabulator (and Chart.js for plots) in `fastpheno-dashboard.html`.
 
 ### Architecture
 
 ```
 III_db_final/  ──(Python prep script)──►  data/fastpheno/*.csv
                                               │
-PCA shell / fastpheno-dashboard.html  ◄───────┘
+fastpheno-dashboard.html  ◄───────────────────┘
   PapaParse → Tabulator tables
   Chart.js → time series / scatter
 ```
 
 ### What tables/charts fit
 
-- **Tabulator tables:** predawn WP records, fluorescence summary per tree, reflectance campaign metadata, TLP parameter summaries
-- **Chart.js line charts:** daily weather, NDVI/GNDVI seasonality, QY_max over time
+- **Tabulator tables:** predawn WP records, raw fluorescence campaign rows, raw reflectance campaign metadata, TLP parameter summaries
+- **Chart.js line charts:** daily weather, NDVI/GNDVI seasonality, QY_max over time (client-side date aggregation from raw campaign rows)
 - **Chart.js scatter/box:** predawn Ψ by cluster; fluorescence vs water potential
 
 ### Data prep needed
 
 - One-time (or periodic) Python/R script to:
   - Subsample weather to recent years or monthly aggregates
-  - Extract reflectance index columns only (drop X304–X1150 wavelengths)
-  - Aggregate fluorescence to daily means per genotype
+  - Combine raw reflectance campaign CSVs into one browser-loadable export
+  - Combine raw fluorescence campaign CSVs into one browser-loadable export
   - Consolidate scattered TLP outputs into one `tlp_summary.csv`
 - Target: keep each CSV under ~2 MB for snappy loads
 
@@ -55,20 +55,20 @@ PCA shell / fastpheno-dashboard.html  ◄───────┘
 
 ### Pros
 
-- Matches existing shell conventions (`efp.css`, Tabulator, PapaParse)
+- Matches BAR shell conventions (`efp.css`, Tabulator, PapaParse)
 - No server dependency beyond `python3 -m http.server`
 - Easy to version-control derived CSVs alongside HTML
-- Fast page loads with pre-aggregated data
+- Raw campaign rows stay faithful to the source database
 
 ### Cons
 
 - Manual or scripted refresh when source data changes
 - Cross-domain joins (e.g. WP + weather on same date) require pre-computation
-- Full reflectance spectra not practical in-browser
+- Full reflectance spectra make the combined browser CSV materially larger
 
 ### Recommended for
 
-**Yes — recommended as the primary path.** The folder-based CSV structure maps naturally to derived flat files. The existing papers shell is already built for this pattern.
+**Yes — recommended as the primary path.** The folder-based CSV structure maps naturally to derived flat files. The dashboard is already built for this pattern.
 
 ---
 
@@ -132,7 +132,7 @@ GROUP BY wp.Cluster;
 
 ## Approach 3: Lightweight backend API (Python Flask/FastAPI or Node)
 
-**Description:** A small local or hosted API reads III_db_final directly from disk and returns JSON for the frontend. The HTML shell stays mostly unchanged; it fetches from `/api/...` endpoints instead of static CSVs.
+**Description:** A small local or hosted API reads III_db_final directly from disk and returns JSON for the frontend. The HTML dashboard stays mostly unchanged; it fetches from `/api/...` endpoints instead of static CSVs.
 
 ### Architecture
 
@@ -188,53 +188,6 @@ Browser (Tabulator + Chart.js) ◄── JSON responses
 
 ---
 
-## Approach 4: Embedded iframe / tab navigation
-
-**Description:** Add a navigation tab or link in the PCA shell that opens or embeds `fastpheno-dashboard.html` as a separate page or iframe panel.
-
-### Architecture
-
-```
-PCA_C-SPIRIT Single Cell Papers.html
-  ├── [Tab: Papers]  → existing Tabulator table (papers.csv)
-  └── [Tab: FastPheno] → <iframe src="fastpheno-dashboard.html">
-                           or <a href="fastpheno-dashboard.html">
-```
-
-### Implementation options
-
-1. **Simple link** (lowest effort): add a nav bar link "FastPheno Dashboard →" in the shell header
-2. **Tab panel**: CSS/JS tabs switching between papers div and iframe div
-3. **Full iframe embed**: dashboard renders inside the shell layout (shared header/footer)
-
-### Data prep needed
-
-- Same as whichever data approach powers the dashboard (Approach 1 CSVs recommended)
-- No additional prep for the iframe itself
-
-### Effort estimate
-
-**Very low (hours)** for a link; **low (1 day)** for styled tab navigation with shared header.
-
-### Pros
-
-- Zero risk to existing papers functionality
-- Dashboard can evolve independently
-- Immediate integration — dashboard already exists
-- Each page stays focused and lightweight
-
-### Cons
-
-- Iframe styling can feel disjointed (scrollbars, height management)
-- Two separate pages to maintain unless iframe is used
-- Shared filters across papers and pheno data not possible without deeper integration
-
-### Recommended for
-
-**Yes — recommended as the immediate integration step.** Add a navigation link or tab now; deepen integration later if needed.
-
----
-
 ## Comparison summary
 
 | Approach | Effort | Server needed | Cross-domain joins | Live data refresh | Best fit |
@@ -242,7 +195,6 @@ PCA_C-SPIRIT Single Cell Papers.html
 | 1. Static CSV + Tabulator | 2–5 days | Static HTTP only | Pre-computed | Manual re-export | **Primary** |
 | 2. SQLite WASM | 5–8 days | Static HTTP only | SQL joins in browser | Re-build .db file | Interactive exploration |
 | 3. Backend API | 1–2 weeks | Python/Node process | Server-side | Automatic | Team/shared deployment |
-| 4. Iframe / tabs | Hours–1 day | Static HTTP only | Depends on dashboard | Depends on dashboard | **Immediate** |
 
 ---
 
@@ -250,17 +202,15 @@ PCA_C-SPIRIT Single Cell Papers.html
 
 Given a **folder-based CSV/Excel database with ~215 files**, two sites, and a researcher-local workflow:
 
-### Phase 1 — Now (done)
+### Phase 1 — Done
 
-1. **Derived CSVs** in `data/fastpheno/` (weather 2022–24, reflectance indices, fluorescence, predawn WP)
-2. **Standalone dashboard** at `fastpheno-dashboard.html` with site/year filters, 4 charts, stats panel, WP table
-3. **Link from shell** — add one line to the papers HTML header (optional, non-breaking)
+1. **Derived CSVs** in `data/fastpheno/` (weather 2010–24, reflectance indices, fluorescence, predawn WP)
+2. **Standalone dashboard** at `fastpheno-dashboard.html` with site/year filters, charts, stats panel, and sensor tables
 
 ### Phase 2 — Short term (1 week)
 
 1. Expand derived CSVs to cover PIK reflectance/fluorescence and 2022/2024 phenotyping years
-2. Add tab navigation in the shell (Approach 4)
-3. Write a `scripts/build_fastpheno_csvs.py` to regenerate derived data from III_db_final
+2. Write a `scripts/build_fastpheno_csvs.py` to regenerate derived data from III_db_final
 
 ### Phase 3 — If needed later
 
@@ -271,19 +221,20 @@ Given a **folder-based CSV/Excel database with ~215 files**, two sites, and a re
 
 - Do not load full reflectance spectra (600+ columns) in the browser
 - Do not embed all 215 raw files — always project to viz-ready subsets
-- Do not refactor the papers table — keep FastPheno as a parallel section
 
 ---
 
-## File inventory (created for this integration)
+## File inventory
 
 | File | Purpose |
 |------|---------|
-| [`fastpheno-dashboard.html`](./fastpheno-dashboard.html) | Standalone dashboard (Chart.js + Tabulator) |
-| [`data/fastpheno/weather_pik_2022-2024.csv`](./data/fastpheno/weather_pik_2022-2024.csv) | PIK daily weather subset |
-| [`data/fastpheno/weather_pin_2022-2024.csv`](./data/fastpheno/weather_pin_2022-2024.csv) | PIN daily weather subset |
-| [`data/fastpheno/reflectance_pin_2023_indices.csv`](./data/fastpheno/reflectance_pin_2023_indices.csv) | Daily NDVI/PRI/GNDVI means |
-| [`data/fastpheno/fluorescence_pin_2023.csv`](./data/fastpheno/fluorescence_pin_2023.csv) | Daily QY_max/NPQ_Lss means |
+| [`fastpheno-dashboard.html`](./fastpheno-dashboard.html) | Primary dashboard (Chart.js + Tabulator) |
+| [`data/fastpheno/PIK_daily_2010-2024.csv`](./data/fastpheno/PIK_daily_2010-2024.csv) | PIK ECCC daily weather (2010–2024) |
+| [`data/fastpheno/PIN_daily_2010-2024.csv`](./data/fastpheno/PIN_daily_2010-2024.csv) | PIN ECCC daily weather (2010–2024) |
+| [`data/fastpheno/PIK_daymet_daily_2010-2024.csv`](./data/fastpheno/PIK_daymet_daily_2010-2024.csv) | PIK Daymet daily weather (2010–2024) |
+| [`data/fastpheno/PIN_daymet_daily_2010-2024.csv`](./data/fastpheno/PIN_daymet_daily_2010-2024.csv) | PIN Daymet daily weather (2010–2024) |
+| [`data/fastpheno/reflectance_indices.csv`](./data/fastpheno/reflectance_indices.csv) | Daily NDVI/PRI/GNDVI means (all sites/years) |
+| [`data/fastpheno/fluorescence_indices.csv`](./data/fastpheno/fluorescence_indices.csv) | Daily QY_max/NPQ_Lss means (all sites/years) |
 | [`data/fastpheno/predawn_wp_2023.csv`](./data/fastpheno/predawn_wp_2023.csv) | Predawn water potential records |
 
 ## How to run

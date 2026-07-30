@@ -1,2 +1,6 @@
 .DS_Store
 .cursor/node_modules/
+.cursor/debug-*.log
+.cursor/*.png
+backend/auth.db
+backend/.env

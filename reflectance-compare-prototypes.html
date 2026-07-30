@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Reflectance date-compare prototype — FastPheno</title>
+  <link rel="stylesheet" href="./efp.css">
+  <script src="./papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    body { max-width: 1100px; margin: 0 auto; padding: 0 14px 40px; }
+    .proto-hero { margin: 12px 0 18px; }
+    .proto-hero h1 { font-size: 14pt; color: #336633; margin: 0 0 6px; }
+    .proto-hero p { font-size: 9pt; color: #555; margin: 0 0 8px; max-width: 72ch; line-height: 1.45; }
+    .workflow {
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+      margin: 0 0 14px; font-size: 9pt; color: #444;
+    }
+    .workflow .step {
+      border: 1px solid #ccc; background: #fafafa; padding: 6px 10px;
+    }
+    .workflow .step strong { color: #336633; }
+    .workflow .arrow { color: #999; }
+    .controls {
+      display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: flex-end;
+      margin: 0 0 14px; padding: 10px; background: #f5f5f5; border: 1px solid #ddd;
+    }
+    .controls label { display: block; font-size: 10pt; font-weight: bold; margin-bottom: 4px; }
+    .controls select { font-size: 10pt; min-width: 140px; }
+    .controls .date-filter-group select { min-width: 72px; }
+    .date-filter-group { display: flex; gap: 8px; align-items: center; }
+    .controls select:disabled { background: #eee; color: #555; cursor: not-allowed; }
+    .lock-hint { font-size: 8pt; color: #666; margin-top: 4px; min-height: 1.1em; }
+    .btn {
+      font-family: inherit; font-size: 10pt; padding: 8px 12px; border: 1px solid #999;
+      background: #fff; cursor: pointer;
+    }
+    .btn.primary { background: #336633; color: #fff; border-color: #336633; }
+    .btn:disabled { opacity: 0.4; cursor: default; }
+    .btn:hover:not(:disabled) { background: #eee; }
+    .btn.primary:hover:not(:disabled) { background: #274d27; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; min-height: 28px; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 8px;
+      border: 1px solid #999; background: #fff; padding: 4px 8px; font-size: 9pt;
+    }
+    .chip button {
+      border: none; background: transparent; cursor: pointer; font-size: 11pt;
+      line-height: 1; color: #666; padding: 0 2px;
+    }
+    .chip button:hover { color: #a00; }
+    .empty {
+      border: 1px dashed #ccc; padding: 28px 16px; text-align: center;
+      color: #666; font-size: 10pt; background: #fafafa; margin: 0 0 12px;
+    }
+    .chart-box { border: 1px solid #ddd; background: #fff; padding: 8px 10px 12px; }
+    .chart-box.is-hidden { display: none; }
+    .chart-box h3 { margin: 0 0 6px; font-size: 10pt; color: #336633; }
+    .chart-canvas { position: relative; height: 420px; }
+    .stats { font-size: 9pt; color: #444; margin: 8px 0 0; line-height: 1.45; }
+    .note {
+      font-size: 9pt; color: #555; margin: 14px 0 0; padding: 8px 10px;
+      background: #fff; border-left: 3px solid #336633;
+    }
+    .status { font-size: 9pt; color: #666; margin: 8px 0; }
+    .status.error { color: #a00; }
+    .back { font-size: 9pt; margin: 8px 0 0; }
+  </style>
+</head>
+<body>
+  <table width="98%" border="0" cellspacing="0" cellpadding="0">
+    <tr>
+      <td>
+        <h1 style="vertical-align:middle;">
+          <a href="https://bar.utoronto.ca/"><img src="./bbc_logo_small.gif" alt="BAR Homepage" border="0" align="absmiddle"></a>&nbsp;
+          <img src="./bar_logo.gif" alt="The Bio-Analytic Resource" border="0" align="absmiddle">&nbsp;
+          Reflectance date-compare prototype<br>
+          <img src="./green_line.gif" width="98%" alt="" height="6px" border="0">
+        </h1>
+      </td>
+    </tr>
+  </table>
+
+  <div class="proto-hero">
+    <h1>Comparison workflow prototype (reflectance)</h1>
+    <p>
+      Pick a metric first, then add site + date series into one chart. Each series is a scatter-box
+      column. You can mix <strong>PIN</strong> and <strong>PIK</strong> (and different dates) in the same comparison.
+      After the first series is added, the metric is locked until you clear.
+    </p>
+    <div class="workflow" aria-label="Comparison workflow">
+      <div class="step"><strong>1.</strong> Choose metric (while empty)</div>
+      <span class="arrow">→</span>
+      <div class="step"><strong>2.</strong> Choose site + date</div>
+      <span class="arrow">→</span>
+      <div class="step"><strong>3.</strong> Add series → scatter-box column</div>
+      <span class="arrow">→</span>
+      <div class="step"><strong>4.</strong> Metric locks · add more site/date columns</div>
+    </div>
+    <p class="back"><a href="./fastpheno-dashboard.html#reflectance">← Back to production reflectance view</a></p>
+    <p class="status" id="load-status">Loading reflectance rows…</p>
+  </div>
+
+  <div class="controls">
+    <div>
+      <label for="metric">Metric</label>
+      <select id="metric"></select>
+      <div class="lock-hint" id="metric-lock-hint"></div>
+    </div>
+    <div>
+      <label for="site">Site</label>
+      <select id="site">
+        <option value="PIN">PIN</option>
+        <option value="PIK">PIK</option>
+      </select>
+    </div>
+    <div>
+      <label>Date</label>
+      <div class="date-filter-group">
+        <select id="year-pick" aria-label="Year">
+          <option value="">Year</option>
+        </select>
+        <select id="month-pick" aria-label="Month">
+          <option value="">Month</option>
+        </select>
+        <select id="day-pick" aria-label="Day">
+          <option value="">Day</option>
+        </select>
+      </div>
+    </div>
+    <div>
+      <button type="button" class="btn primary" id="btn-add">Add series to chart</button>
+    </div>
+    <div>
+      <button type="button" class="btn" id="btn-clear" disabled>Clear comparison</button>
+    </div>
+  </div>
+
+  <div class="chips" id="selected-series" aria-live="polite"></div>
+  <div class="empty" id="empty-state">No series yet. Choose a metric, then a site + date, and add it to the chart.</div>
+  <div class="chart-box is-hidden" id="chart-box">
+    <h3 id="chart-title">Site / date comparison</h3>
+    <div class="chart-canvas"><canvas id="compare-chart"></canvas></div>
+    <p class="stats" id="chart-stats"></p>
+  </div>
+
+  <div class="note">
+    Each column is one site–date series for the locked metric. Example: PIN · May 7 vs PIK · May 22.
+    Clear the comparison to change metric.
+  </div>
+
+<script>
+const DATA_PATH = "./data/fastpheno/reflectance_indices.csv";
+const METRICS = [
+  { field: "NDVI", label: "NDVI", color: "#228B22" },
+  { field: "PRI", label: "PRI", color: "#cc6600" },
+  { field: "GNDVI", label: "GNDVI", color: "#4169E1" },
+  { field: "EVI", label: "EVI", color: "#993366" },
+  { field: "NDRE", label: "NDRE", color: "#669933" },
+  { field: "SAVI", label: "SAVI", color: "#8B4513" },
+  { field: "CIRE", label: "CIRE", color: "#6A5ACD" },
+];
+const SERIES_COLORS = ["#336633", "#cc6600", "#4169E1", "#993366", "#2F4F4F"];
+const MONTH_NAMES = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+let reflectance = [];
+/** @type {{ site: string, date: string }[]} */
+let selectedSeries = [];
+let compareChart = null;
+
+function seriesKey(series) {
+  return `${series.site}__${series.date}`;
+}
+
+function parseMetricValue(raw) {
+  if (raw == null || raw === "" || raw === "NA") return null;
+  const v = typeof raw === "number" ? raw : parseFloat(raw);
+  return Number.isFinite(v) ? v : null;
+}
+
+function parseDateValue(d) {
+  if (d == null || d === "") return null;
+  const m = String(d).trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (!m) return null;
+  return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+}
+
+function formatDateLabel(iso) {
+  if (!iso) return "—";
+  return new Date(iso + "T00:00:00").toLocaleDateString(undefined, {
+    weekday: "short", year: "numeric", month: "short", day: "numeric",
+  });
+}
+
+function shortDateLabel(iso) {
+  if (!iso) return "—";
+  return new Date(iso + "T00:00:00").toLocaleDateString(undefined, {
+    month: "short", day: "numeric", year: "2-digit",
+  });
+}
+
+function seriesLabel(series) {
+  return `${series.site} · ${shortDateLabel(series.date)}`;
+}
+
+function seriesFullLabel(series) {
+  return `${series.site} · ${formatDateLabel(series.date)}`;
+}
+
+function metricDef() {
+  const field = document.getElementById("metric").value;
+  return METRICS.find(m => m.field === field) || METRICS[0];
+}
+
+function currentSite() {
+  return document.getElementById("site").value;
+}
+
+function filterRows(site, date) {
+  return reflectance.filter(r => {
+    if (String(r.site).toUpperCase() !== site) return false;
+    return parseDateValue(r.date) === date;
+  });
+}
+
+function availableDates(site) {
+  const used = new Set(
+    selectedSeries.filter(s => s.site === site).map(s => s.date)
+  );
+  return [...new Set(
+    reflectance
+      .filter(r => String(r.site).toUpperCase() === site)
+      .map(r => parseDateValue(r.date))
+      .filter(Boolean)
+  )]
+    .filter(d => !used.has(d))
+    .sort();
+}
+
+function getPickedDate() {
+  const year = document.getElementById("year-pick").value;
+  const month = document.getElementById("month-pick").value;
+  const day = document.getElementById("day-pick").value;
+  if (!year || !month || !day) return "";
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function populateDateFilters({ reset = false, cascadeFrom = null } = {}) {
+  const yearSel = document.getElementById("year-pick");
+  const monthSel = document.getElementById("month-pick");
+  const daySel = document.getElementById("day-pick");
+  const dates = availableDates(currentSite());
+  const prevYear = reset ? "" : yearSel.value;
+  const prevMonth = reset || cascadeFrom === "year" ? "" : monthSel.value;
+  const prevDay = reset || cascadeFrom === "year" || cascadeFrom === "month" ? "" : daySel.value;
+
+  const years = [...new Set(dates.map(d => d.slice(0, 4)))].sort();
+  yearSel.innerHTML = years.length
+    ? years.map(y => `<option value="${y}">${y}</option>`).join("")
+    : '<option value="">No years</option>';
+  if (!years.length) {
+    yearSel.value = "";
+    monthSel.innerHTML = '<option value="">Month</option>';
+    monthSel.value = "";
+    daySel.innerHTML = '<option value="">Day</option>';
+    daySel.value = "";
+    document.getElementById("btn-add").disabled = true;
+    return;
+  }
+  yearSel.value = prevYear && years.includes(prevYear) ? prevYear : years[years.length - 1];
+
+  const year = yearSel.value;
+  const months = [...new Set(
+    dates.filter(d => d.startsWith(`${year}-`)).map(d => parseInt(d.slice(5, 7), 10))
+  )].sort((a, b) => a - b);
+  monthSel.innerHTML = months.length
+    ? months.map(m => `<option value="${m}">${MONTH_NAMES[m]}</option>`).join("")
+    : '<option value="">No months</option>';
+  if (!months.length) {
+    monthSel.value = "";
+    daySel.innerHTML = '<option value="">Day</option>';
+    daySel.value = "";
+    document.getElementById("btn-add").disabled = true;
+    return;
+  }
+  const monthNum = prevMonth && months.includes(parseInt(prevMonth, 10))
+    ? parseInt(prevMonth, 10)
+    : months[months.length - 1];
+  monthSel.value = String(monthNum);
+
+  const mm = String(monthNum).padStart(2, "0");
+  const days = [...new Set(
+    dates.filter(d => d.startsWith(`${year}-${mm}-`)).map(d => parseInt(d.slice(8, 10), 10))
+  )].sort((a, b) => a - b);
+  daySel.innerHTML = days.length
+    ? days.map(d => `<option value="${d}">${d}</option>`).join("")
+    : '<option value="">No days</option>';
+  if (!days.length) {
+    daySel.value = "";
+    document.getElementById("btn-add").disabled = true;
+    return;
+  }
+  const dayNum = prevDay && days.includes(parseInt(prevDay, 10))
+    ? parseInt(prevDay, 10)
+    : days[days.length - 1];
+  daySel.value = String(dayNum);
+  document.getElementById("btn-add").disabled = selectedSeries.length >= 4;
+}
+
+function computeBoxStats(values) {
+  const sorted = values.filter(v => v != null).sort((a, b) => a - b);
+  const n = sorted.length;
+  if (!n) return null;
+  const percentile = (p) => {
+    const idx = (n - 1) * p;
+    const lo = Math.floor(idx);
+    const hi = Math.ceil(idx);
+    if (lo === hi) return sorted[lo];
+    return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+  };
+  return {
+    min: sorted[0], q1: percentile(0.25), median: percentile(0.5),
+    q3: percentile(0.75), max: sorted[n - 1], n,
+  };
+}
+
+function getNiceBounds(values, padFrac = 0.1) {
+  const finite = values.filter(Number.isFinite);
+  if (!finite.length) return {};
+  const min = Math.min(...finite);
+  const max = Math.max(...finite);
+  const span = max - min || Math.max(Math.abs(max), 1) * 0.1;
+  const pad = span * padFrac;
+  return { min: min - pad, max: max + pad };
+}
+
+function pseudoJitter(groupIndex, pointIndex, spread) {
+  const seed = Math.sin((groupIndex + 1) * 9973 + (pointIndex + 1) * 1319) * 10000;
+  return (seed - Math.floor(seed) - 0.5) * spread;
+}
+
+function hexToRgba(hex, alpha = 0.55) {
+  const n = hex.replace("#", "");
+  const full = n.length === 3 ? n.split("").map(c => c + c).join("") : n;
+  const int = parseInt(full, 16);
+  return `rgba(${(int >> 16) & 255}, ${(int >> 8) & 255}, ${int & 255}, ${alpha})`;
+}
+
+function drawBoxWhisker(ctx, x, yStart, yEnd, cap) {
+  ctx.beginPath(); ctx.moveTo(x, yStart); ctx.lineTo(x, yEnd); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x - cap / 2, yStart); ctx.lineTo(x + cap / 2, yStart); ctx.stroke();
+}
+
+const scatterBoxOverlayPlugin = {
+  id: "scatterBoxOverlayCompare",
+  beforeDatasetsDraw(chart) {
+    const groups = chart.$scatterBoxGroups;
+    if (!groups?.length) return;
+    const { ctx, scales: { x: xScale, y: yScale } } = chart;
+    const boxHalfWidth = Math.min(
+      Math.abs(xScale.getPixelForValue(0.35) - xScale.getPixelForValue(0)),
+      32
+    );
+    groups.forEach(group => {
+      const { stats, color } = group;
+      const x = xScale.getPixelForValue(group.groupIndex);
+      const xLeft = x - boxHalfWidth;
+      const yQ1 = yScale.getPixelForValue(stats.q1);
+      const yQ3 = yScale.getPixelForValue(stats.q3);
+      ctx.save();
+      ctx.fillStyle = hexToRgba(color, 0.18);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(xLeft, yQ3, boxHalfWidth * 2, yQ1 - yQ3);
+      ctx.strokeRect(xLeft, yQ3, boxHalfWidth * 2, yQ1 - yQ3);
+      const cap = Math.min(boxHalfWidth, 24);
+      drawBoxWhisker(ctx, x, yScale.getPixelForValue(stats.min), yQ1, cap);
+      drawBoxWhisker(ctx, x, yQ3, yScale.getPixelForValue(stats.max), cap);
+      ctx.lineWidth = 2.5;
+      const yMed = yScale.getPixelForValue(stats.median);
+      ctx.beginPath();
+      ctx.moveTo(xLeft, yMed);
+      ctx.lineTo(xLeft + boxHalfWidth * 2, yMed);
+      ctx.stroke();
+      ctx.restore();
+    });
+  },
+};
+
+function destroyChart() {
+  if (compareChart) {
+    compareChart.destroy();
+    compareChart = null;
+  }
+}
+
+function syncMetricLock() {
+  const locked = selectedSeries.length > 0;
+  const metricSel = document.getElementById("metric");
+  metricSel.disabled = locked;
+  document.getElementById("metric-lock-hint").textContent = locked
+    ? "Locked while series are on the chart — clear to change."
+    : "Choose freely before adding the first series.";
+}
+
+function renderChips() {
+  const wrap = document.getElementById("selected-series");
+  wrap.innerHTML = selectedSeries.map((series, i) => `
+    <span class="chip" style="border-color:${SERIES_COLORS[i % SERIES_COLORS.length]}">
+      ${seriesFullLabel(series)}
+      <button type="button" data-remove="${seriesKey(series)}" aria-label="Remove ${seriesFullLabel(series)}">×</button>
+    </span>
+  `).join("");
+  wrap.querySelectorAll("button[data-remove]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      selectedSeries = selectedSeries.filter(s => seriesKey(s) !== btn.dataset.remove);
+      render();
+    });
+  });
+}
+
+function buildGroups(metric) {
+  return selectedSeries.map((series, i) => {
+    const rows = filterRows(series.site, series.date);
+    const values = [];
+    const pointLabels = [];
+    rows.forEach((r, idx) => {
+      const v = parseMetricValue(r[metric.field]);
+      if (v == null) return;
+      values.push(v);
+      pointLabels.push(r.primary_key || `row ${idx + 1}`);
+    });
+    const stats = computeBoxStats(values);
+    if (!stats) return null;
+    return {
+      groupIndex: i,
+      series,
+      label: seriesLabel(series),
+      color: SERIES_COLORS[i % SERIES_COLORS.length],
+      values,
+      pointLabels,
+      stats,
+    };
+  }).filter(Boolean);
+}
+
+function renderChart() {
+  const empty = document.getElementById("empty-state");
+  const box = document.getElementById("chart-box");
+  const metric = metricDef();
+  document.getElementById("btn-clear").disabled = selectedSeries.length === 0;
+  syncMetricLock();
+  destroyChart();
+
+  if (!selectedSeries.length) {
+    empty.style.display = "block";
+    box.classList.add("is-hidden");
+    document.getElementById("chart-stats").textContent = "";
+    return;
+  }
+
+  empty.style.display = "none";
+  box.classList.remove("is-hidden");
+
+  const groups = buildGroups(metric);
+  const points = [];
+  groups.forEach(group => {
+    const spread = Math.min(0.7, 0.2 + group.values.length * 0.003);
+    group.values.forEach((y, i) => {
+      points.push({
+        x: group.groupIndex + pseudoJitter(group.groupIndex, i, spread),
+        y,
+        label: group.pointLabels[i],
+        groupLabel: group.label,
+        color: group.color,
+      });
+    });
+  });
+
+  const yBounds = getNiceBounds(points.map(p => p.y));
+  document.getElementById("chart-title").textContent =
+    groups.length === 1
+      ? `${metric.label} — ${seriesFullLabel(groups[0].series)}`
+      : `${metric.label} — ${groups.length} series (sites / dates)`;
+
+  compareChart = new Chart(document.getElementById("compare-chart"), {
+    type: "scatter",
+    data: {
+      datasets: [{
+        label: "Field measurements",
+        data: points,
+        backgroundColor: points.map(p => hexToRgba(p.color, 0.55)),
+        borderColor: points.map(p => p.color),
+        borderWidth: 1,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          type: "linear",
+          min: -0.55,
+          max: Math.max(groups.length - 0.45, 0.55),
+          title: { display: true, text: "Site · date", font: { size: 9 } },
+          ticks: {
+            stepSize: 1,
+            font: { size: 9 },
+            callback(value) {
+              if (!Number.isInteger(value)) return "";
+              return this.chart.$scatterBoxGroups?.find(g => g.groupIndex === value)?.label || "";
+            },
+          },
+          grid: { drawOnChartArea: false },
+        },
+        y: {
+          beginAtZero: false,
+          min: yBounds.min,
+          max: yBounds.max,
+          title: { display: true, text: metric.label, font: { size: 9 } },
+          ticks: { font: { size: 9 } },
+        },
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label(ctx) {
+              const p = ctx.raw;
+              return `${p.groupLabel} · ${p.label}: ${Number(p.y).toFixed(3)}`;
+            },
+          },
+        },
+      },
+    },
+    plugins: [scatterBoxOverlayPlugin],
+  });
+  compareChart.$scatterBoxGroups = groups;
+
+  document.getElementById("chart-stats").innerHTML = groups.map(g => {
+    const s = g.stats;
+    return `<strong>${seriesFullLabel(g.series)}</strong>: n=${s.n}, median ${s.median.toFixed(3)} (IQR ${s.q1.toFixed(3)}–${s.q3.toFixed(3)})`;
+  }).join("<br>");
+}
+
+function render() {
+  renderChips();
+  renderChart();
+  populateDateFilters();
+}
+
+function fillMetricSelect() {
+  const sel = document.getElementById("metric");
+  sel.innerHTML = METRICS.map(m => `<option value="${m.field}">${m.label}</option>`).join("");
+  sel.value = "NDVI";
+}
+
+function addSelectedSeries() {
+  const site = currentSite();
+  const date = getPickedDate();
+  if (!site || !date) return;
+  const next = { site, date };
+  if (selectedSeries.some(s => seriesKey(s) === seriesKey(next))) return;
+  if (selectedSeries.length >= 4) {
+    alert("Prototype limit: compare up to 4 series in one chart.");
+    return;
+  }
+  selectedSeries = [...selectedSeries, next];
+  render();
+}
+
+document.getElementById("btn-add").addEventListener("click", addSelectedSeries);
+document.getElementById("btn-clear").addEventListener("click", () => {
+  selectedSeries = [];
+  render();
+});
+document.getElementById("site").addEventListener("change", () => {
+  populateDateFilters({ reset: true });
+});
+document.getElementById("year-pick").addEventListener("change", () => {
+  populateDateFilters({ cascadeFrom: "year" });
+});
+document.getElementById("month-pick").addEventListener("change", () => {
+  populateDateFilters({ cascadeFrom: "month" });
+});
+document.getElementById("metric").addEventListener("change", () => {
+  if (selectedSeries.length === 0) render();
+});
+
+fetch(DATA_PATH)
+  .then(r => {
+    if (!r.ok) throw new Error("Failed to load " + DATA_PATH);
+    return r.text();
+  })
+  .then(text => {
+    const parsed = Papa.parse(text, { header: true, skipEmptyLines: true, dynamicTyping: true });
+    reflectance = parsed.data;
+    fillMetricSelect();
+    populateDateFilters({ reset: true });
+    render();
+    document.getElementById("load-status").textContent =
+      `Loaded ${reflectance.length.toLocaleString()} reflectance rows.`;
+  })
+  .catch(err => {
+    const el = document.getElementById("load-status");
+    el.className = "status error";
+    el.textContent = err.message + " — open via http://localhost:8090/reflectance-compare-prototypes.html";
+  });
+</script>
+</body>
+</html>

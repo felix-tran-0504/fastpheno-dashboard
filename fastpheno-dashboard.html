@@ -11,32 +11,95 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     body { max-width: 1200px; margin: 0 auto; padding: 0 12px 24px; }
-    .controls { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin: 12px 0; padding: 10px; background: #f5f5f5; border: 1px solid #ddd; }
-    .controls label { font-size: 9pt; font-weight: bold; }
-    .controls select { font-size: 9pt; padding: 3px 6px; }
-    .stats-panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 12px 0; }
-    .stat-card { background: #fafafa; border: 1px solid #ccc; padding: 10px; text-align: center; }
-    .stat-card .value { font-size: 14pt; font-weight: bold; color: #336633; }
-    .stat-card .label { font-size: 8pt; color: #666; margin-top: 4px; }
+    .controls { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; margin: 12px 0; padding: 10px; background: #f5f5f5; border: 1px solid #ddd; }
+    #sensor-controls { display: flex; flex-direction: column; align-items: stretch; width: 100%; }
+    #sensor-controls .controls { width: 100%; margin: 12px 0; box-sizing: border-box; justify-content: center; }
+    #sensor-controls.weather-active .controls { margin: 6px 0; }
+    #sensor-controls.weather-active .controls:first-child { margin-top: 12px; }
+    #sensor-controls.weather-active .controls:last-child { margin-bottom: 12px; }
+    .controls label { font-size: 11pt; font-weight: bold; display: block; margin-bottom: 4px; }
+    .controls select {
+      font-size: 10pt; padding: 8px 10px; min-height: 36px; box-sizing: border-box;
+    }
+    .date-filter-group { display: flex; gap: 8px; align-items: center; }
     .chart-box { border: 1px solid #ddd; padding: 10px; background: #fff; }
     .chart-box.weather-chart-standalone { margin: 12px 0 16px; }
     .is-hidden { display: none !important; }
     .search-empty { font-size: 9pt; color: #999; font-style: italic; margin: 8px 0 12px; }
     .chart-box h3 { font-size: 10pt; margin: 0 0 8px; color: #666; }
-    .chart-canvas { position: relative; height: 260px; }
-    #wp-scatter { height: 280px; }
+    .chart-canvas { position: relative; height: 300px; }
+    #fluorescence-chart-box .chart-canvas,
+    #reflectance-chart-box .chart-canvas,
+    #wp-chart-box .chart-canvas { height: 420px; }
+    #wp-scatter { height: 420px; }
+    .lock-hint { font-size: 8pt; color: #666; margin-top: 4px; min-height: 1.1em; }
+    .series-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; min-height: 28px; }
+    .series-chip {
+      display: inline-flex; align-items: center; gap: 8px;
+      border: 1px solid #999; background: #fff; padding: 4px 8px; font-size: 9pt;
+    }
+    .series-chip button {
+      border: none; background: transparent; cursor: pointer; font-size: 11pt;
+      line-height: 1; color: #666; padding: 0 2px; font-family: inherit;
+    }
+    .series-chip button:hover { color: #a00; }
+    .compare-empty {
+      border: 1px dashed #ccc; padding: 20px 14px; text-align: center;
+      color: #666; font-size: 9pt; background: #fafafa; margin: 0 0 12px;
+    }
+    .btn.primary { background: #336633; color: #fff; border-color: #336633; }
+    .btn.primary:hover:not(:disabled) { background: #274d27; color: #fff; }
+    .controls select:disabled { background: #eee; color: #555; cursor: not-allowed; }
+    #weather-chart-box .chart-canvas { height: 340px; }
+    #wp-scatter { height: 320px; }
     #summary-table { margin-top: 16px; }
     .section-title { font-size: 11pt; color: #336633; margin: 20px 0 8px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
     .loading { color: #999; font-style: italic; }
-    .controls input[type="date"] { font-size: 9pt; padding: 3px 6px; }
-    .records-date-filter .date-filter-group { display: flex; gap: 6px; align-items: center; }
-    .records-date-filter select { font-size: 9pt; padding: 3px 6px; }
-    .records-date-filter { margin: 0 0 10px; padding: 8px 10px; }
+    .controls input[type="date"] {
+      font-size: 10pt; padding: 8px 10px; min-height: 36px; box-sizing: border-box;
+    }
+    .btn-row { display: flex; gap: 4px; align-items: center; }
+    .btn {
+      font-size: 9pt; padding: 4px 10px; border: 1px solid #999; background: #fff;
+      cursor: pointer; font-family: inherit;
+    }
+    .btn:hover { background: #eee; }
+    .btn:disabled { opacity: 0.4; cursor: default; }
+    .mode-toggle { display: flex; border: 1px solid #999; }
+    .mode-toggle button {
+      font-size: 10pt; padding: 8px 16px; min-height: 36px; box-sizing: border-box;
+      border: none; background: #fff; cursor: pointer; font-family: inherit;
+    }
+    .mode-toggle button.active { background: #336633; color: #fff; }
+    #weather-single-view { display: flex; justify-content: center; }
+    .detail-panel { border: 1px solid #ddd; padding: 12px; background: #fafafa; max-width: 360px; margin: 0 0 16px; }
+    #weather-detail.detail-panel {
+      width: 100%; max-width: 520px; padding: 20px 28px; margin: 0 0 20px;
+    }
+    .detail-panel h4 { margin: 0 0 8px; font-size: 10pt; color: #336633; }
+    #weather-detail h4 { margin: 0 0 14px; font-size: 14pt; }
+    .detail-row { display: flex; justify-content: space-between; font-size: 9pt; padding: 3px 0; border-bottom: 1px solid #eee; }
+    #weather-detail .detail-row { font-size: 11pt; padding: 8px 0; }
+    .detail-row:last-child { border-bottom: none; }
+    .weather-detail-site { margin-bottom: 10px; }
+    #weather-detail .weather-detail-site { margin-bottom: 14px; }
+    .weather-detail-site:last-child { margin-bottom: 0; }
+    #weather-detail .weather-detail-site strong { font-size: 10pt; color: #666; display: block; margin-bottom: 6px; }
+    .range-label { font-size: 9pt; color: #666; font-style: italic; margin: 0 0 8px; }
     .result-count { margin: 4px 0 10px; font-size: 9pt; font-weight: bold; color: #666; }
     .dataset-count { margin: 4px 0 6px; font-size: 8pt; color: #888; }
     .data-table { margin-bottom: 8px; }
-    #weather-table.data-table { overflow-x: auto; max-width: 100%; }
-    #weather-table.tabulator { min-width: 640px; }
+    #weather-table.data-table,
+    #fluorescence-table.data-table,
+    #reflectance-table.data-table,
+    #summary-table.data-table { overflow-x: auto; max-width: 100%; }
+    #weather-table.tabulator,
+    #fluorescence-table.tabulator,
+    #reflectance-table.tabulator { min-width: 100%; }
+    .data-table-footer {
+      display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin: 8px 0 12px;
+    }
+    .data-table-footer .btn { font-size: 10pt; padding: 8px 14px; }
     /* Critical Tabulator grid layout — keeps tables readable if tabulator.min.css fails to load */
     .tabulator { overflow: hidden; position: relative; border: 1px solid #999; background: #fff; }
     .tabulator .tabulator-header { overflow: hidden; position: relative; white-space: nowrap; background: #e6e6e6; border-bottom: 1px solid #999; }
@@ -52,6 +115,78 @@
     .metadata-panel table { border-collapse: collapse; width: 100%; margin: 6px 0; font-size: 8pt; }
     .metadata-panel th, .metadata-panel td { border: 1px solid #ccc; padding: 3px 6px; text-align: left; vertical-align: top; }
     .metadata-panel th { background: #eee; }
+    .sensor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin: 16px 0 24px; }
+    .sensor-card {
+      display: block; width: 100%; text-align: left; padding: 16px 18px;
+      background: #fff; border: 1px solid #ccc; border-left: 4px solid #336633;
+      cursor: pointer; font-family: inherit; font-size: 9pt; color: #333;
+      transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+    }
+    .sensor-card:hover, .sensor-card:focus {
+      background: #f8faf8; border-color: #336633; box-shadow: 0 2px 6px rgba(0,0,0,0.08); outline: none;
+    }
+    .sensor-card h3 { font-size: 11pt; color: #336633; margin: 0 0 6px; }
+    .sensor-card p { margin: 0; color: #666; line-height: 1.45; font-size: 9pt; }
+    .sensor-card .sensor-tag { display: inline-block; margin-top: 10px; font-size: 8pt; color: #888; font-style: italic; }
+    .nav-back { margin: 0 0 12px; font-size: 9pt; }
+    .nav-back a { color: #336633; text-decoration: none; }
+    .nav-back a:hover { text-decoration: underline; }
+    #sensor-view-header { font-size: 11pt; color: #336633; margin: 0 0 12px; border-bottom: 1px solid #ccc; padding-bottom: 6px; }
+
+    .prototype-banner {
+      margin: 0 0 14px; padding: 10px 12px; background: #f4f7f4; border: 1px solid #c5d4c5;
+      font-size: 9pt; color: #444;
+    }
+    .prototype-banner a { color: #336633; }
+    .domain-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 16px 0 24px; }
+    @media (max-width: 900px) { .domain-grid { grid-template-columns: 1fr; } }
+    .domain-card {
+      border: 1px solid #ccc; background: #fff; padding: 0; overflow: hidden;
+    }
+    .domain-card-head {
+      padding: 12px 14px; border-bottom: 1px solid #ddd; background: #f7f9f7;
+    }
+    .domain-card-head h3 { margin: 0 0 4px; font-size: 12pt; color: #336633; }
+    .domain-card-head p { margin: 0; font-size: 8.5pt; color: #666; line-height: 1.4; }
+    .domain-card-body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+    .entity-card {
+      display: block; width: 100%; text-align: left; padding: 10px 12px;
+      background: #fff; border: 1px solid #ddd; border-left: 3px solid #999;
+      cursor: pointer; font-family: inherit; font-size: 9pt; color: #333;
+    }
+    .entity-card.available { border-left-color: #336633; }
+    .entity-card.blank { border-left-color: #bbb; opacity: 0.92; }
+    .entity-card:hover, .entity-card:focus {
+      background: #f8faf8; border-color: #336633; outline: none;
+    }
+    .entity-card .entity-name { font-weight: bold; color: #336633; margin: 0 0 2px; font-size: 10pt; }
+    .entity-card.blank .entity-name { color: #555; }
+    .entity-card .entity-desc { margin: 0; color: #666; font-size: 8.5pt; line-height: 1.35; }
+    .entity-card .entity-status {
+      display: inline-block; margin-top: 6px; font-size: 8pt; font-style: italic; color: #888;
+    }
+    .entity-card.available .entity-status { color: #336633; }
+    .domain-tabs, .entity-tabs {
+      display: flex; flex-wrap: wrap; gap: 0; margin: 0 0 14px; border-bottom: 1px solid #ccc;
+    }
+    .domain-tabs button, .entity-tabs button {
+      font-family: inherit; font-size: 9.5pt; padding: 8px 14px; border: 1px solid transparent;
+      border-bottom: none; background: transparent; cursor: pointer; color: #555;
+      margin-bottom: -1px;
+    }
+    .domain-tabs button.active, .entity-tabs button.active {
+      background: #fff; border-color: #ccc; border-bottom-color: #fff; color: #336633; font-weight: bold;
+    }
+    .domain-tabs button:hover, .entity-tabs button:hover { color: #336633; }
+    .entity-tabs button.blank-tab { color: #888; }
+    .entity-tabs button.blank-tab.active { color: #666; }
+    .blank-panel {
+      border: 1px dashed #ccc; background: #fafafa; padding: 36px 20px; text-align: center;
+      margin: 8px 0 20px; color: #666; font-size: 9.5pt;
+    }
+    .blank-panel h3 { margin: 0 0 8px; font-size: 12pt; color: #555; }
+    .blank-panel p { margin: 0 auto; max-width: 420px; line-height: 1.45; }
+    .blank-panel .pk-hint { margin-top: 12px; font-size: 8.5pt; color: #888; font-style: italic; }
   </style>
 </head>
 <body>
@@ -68,197 +203,336 @@
     </tr>
   </table>
 
-  <p style="font-size:9pt;color:#666;">
-    Preview dashboard for III_db_final subsets: weather (ECCC daily), reflectance indices (NDVI/PRI/GNDVI),
-    chlorophyll fluorescence (QY<sub>max</sub>, NPQ), and predawn water potential.
-    <a href="./PCA_C-SPIRIT Single Cell Papers.html">← Back to PCA/C-SPIRIT Papers</a>
+  <div class="prototype-banner" id="auth-user-bar" style="display:none; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+    <span id="auth-user-email" style="font-size:9pt;"></span>
+    <form method="post" action="/auth/logout" style="margin:0;">
+      <button type="submit" class="btn" style="font-size:9pt;">Sign out</button>
+    </form>
+  </div>
+
+  <div class="prototype-banner">
+    Navigation follows the FastPheno schema: <strong>UAV</strong>, <strong>Ground Data</strong>, and <strong>Environmental Data</strong>.
+    Green-marked entities have data in this build; others are placeholders for future exports.
+  </div>
+
+  <p id="intro-text" style="font-size:9pt;color:#666;">
+    Choose a domain and entity to explore weather/climate, reflectance, chlorophyll fluorescence, and predawn water potential.
   </p>
 
-  <div class="controls">
-    <div>
-      <label for="site-filter">Site</label><br>
-      <select id="site-filter">
-        <option value="all">All sites</option>
-        <option value="PIK">Pickering (PIK)</option>
-        <option value="PIN" selected>Pintendre (PIN)</option>
-      </select>
-    </div>
-    <div>
-      <label for="year-filter">Year</label><br>
-      <select id="year-filter">
-        <option value="all">All years</option>
-      </select>
+  <div id="home-page">
+    <div class="section-title">Database domains</div>
+    <p style="font-size:9pt;color:#666;margin:0 0 12px;">
+      Choose a domain, then open an entity tab. Linked tables in the ERD share <code>primary_key</code> (tree) or <code>siteID</code> (site).
+    </p>
+    <div class="domain-grid" id="domain-home-grid">
+      <!-- filled by JS -->
     </div>
   </div>
 
-  <div class="stats-panel" id="stats-panel">
-    <div class="stat-card"><div class="value loading">—</div><div class="label">Loading…</div></div>
-  </div>
+  <div id="sensor-view" class="is-hidden">
+    <p class="nav-back"><a href="#" id="back-to-home">← Back to database domains</a></p>
+    <div class="domain-tabs" id="domain-tabs" role="tablist" aria-label="Database domain"></div>
+    <h2 id="sensor-view-header"></h2>
+    <div class="entity-tabs" id="entity-tabs" role="tablist" aria-label="Domain entity"></div>
+
+    <div id="blank-section" class="is-hidden">
+      <div class="blank-panel">
+        <h3 id="blank-title">No data loaded yet</h3>
+        <p id="blank-body">This entity exists in the wider ERD but has not been wired to a browser export in the current build.</p>
+        <p class="pk-hint" id="blank-pk-hint"></p>
+      </div>
+    </div>
+
+    <div id="sensor-controls">
+      <div id="weather-controls-view" class="controls is-hidden">
+        <div>
+          <label>View</label>
+          <div class="mode-toggle" id="weather-mode-toggle">
+            <button type="button" class="active" data-mode="single">Single day</button>
+            <button type="button" data-mode="range">Date range</button>
+          </div>
+        </div>
+        <div id="weather-single-controls">
+          <label for="weather-date">Date</label>
+          <input type="date" id="weather-date">
+        </div>
+        <div id="weather-range-from" class="is-hidden">
+          <label for="weather-from-date">From</label>
+          <input type="date" id="weather-from-date">
+        </div>
+        <div id="weather-range-to" class="is-hidden">
+          <label for="weather-to-date">To</label>
+          <input type="date" id="weather-to-date">
+        </div>
+      </div>
+
+      <div id="sensor-controls-filters" class="controls weather-controls-filters">
+      <div id="site-filter-control">
+        <label for="site-filter">Site</label>
+        <select id="site-filter">
+          <option value="all">All sites</option>
+          <option value="PIK">Pickering (PIK)</option>
+          <option value="PIN" selected>Pintendre (PIN)</option>
+        </select>
+      </div>
+      <div id="weather-source-control" class="is-hidden">
+        <label for="weather-source">Source</label>
+        <select id="weather-source">
+          <option value="eccc" selected>ECCC</option>
+          <option value="daymet">Daymet</option>
+        </select>
+      </div>
+      <div id="weather-metric-control" class="is-hidden">
+        <label for="weather-metric">Metric</label>
+        <select id="weather-metric"></select>
+      </div>
+      <div id="fluor-metric-control" class="is-hidden">
+        <label for="fluor-metric">Metric</label>
+        <select id="fluor-metric"></select>
+      </div>
+      <div id="fluor-date-mode-control" class="is-hidden">
+        <label>View</label>
+        <div class="mode-toggle" id="fluor-mode-toggle">
+          <button type="button" class="active" data-mode="compare">Compare dates</button>
+          <button type="button" data-mode="range">Date range</button>
+        </div>
+      </div>
+      <div id="fluor-site-control" class="is-hidden">
+        <label for="fluor-site">Site</label>
+        <select id="fluor-site">
+          <option value="PIN">Pintendre (PIN)</option>
+          <option value="PIK">Pickering (PIK)</option>
+        </select>
+      </div>
+      <div id="fluor-range-from" class="is-hidden">
+        <label for="fluor-from-date">From</label>
+        <input type="date" id="fluor-from-date">
+      </div>
+      <div id="fluor-range-to" class="is-hidden">
+        <label for="fluor-to-date">To</label>
+        <input type="date" id="fluor-to-date">
+      </div>
+      <div id="fluor-filter-group" class="is-hidden">
+        <label>Date</label>
+        <div class="date-filter-group">
+          <select id="fluor-year" aria-label="Fluorescence year">
+            <option value="">Year</option>
+          </select>
+          <select id="fluor-month" aria-label="Fluorescence month">
+            <option value="">Month</option>
+          </select>
+          <select id="fluor-day" aria-label="Fluorescence day">
+            <option value="">Day</option>
+          </select>
+        </div>
+      </div>
+      <div id="fluor-compare-actions" class="is-hidden">
+        <label>&nbsp;</label>
+        <div class="btn-row">
+          <button type="button" class="btn primary" id="fluor-add-series">Add series</button>
+          <button type="button" class="btn" id="fluor-clear-series" disabled>Clear</button>
+        </div>
+      </div>
+      <div id="refl-metric-control" class="is-hidden">
+        <label for="refl-metric">Metric</label>
+        <select id="refl-metric"></select>
+      </div>
+      <div id="refl-date-mode-control" class="is-hidden">
+        <label>View</label>
+        <div class="mode-toggle" id="refl-mode-toggle">
+          <button type="button" class="active" data-mode="compare">Compare dates</button>
+          <button type="button" data-mode="range">Date range</button>
+        </div>
+      </div>
+      <div id="refl-site-control" class="is-hidden">
+        <label for="refl-site">Site</label>
+        <select id="refl-site">
+          <option value="PIN">Pintendre (PIN)</option>
+          <option value="PIK">Pickering (PIK)</option>
+        </select>
+      </div>
+      <div id="refl-range-from" class="is-hidden">
+        <label for="refl-from-date">From</label>
+        <input type="date" id="refl-from-date">
+      </div>
+      <div id="refl-range-to" class="is-hidden">
+        <label for="refl-to-date">To</label>
+        <input type="date" id="refl-to-date">
+      </div>
+      <div id="refl-filter-group" class="is-hidden">
+        <label>Date</label>
+        <div class="date-filter-group">
+          <select id="refl-year" aria-label="Reflectance year">
+            <option value="">Year</option>
+          </select>
+          <select id="refl-month" aria-label="Reflectance month">
+            <option value="">Month</option>
+          </select>
+          <select id="refl-day" aria-label="Reflectance day">
+            <option value="">Day</option>
+          </select>
+        </div>
+      </div>
+      <div id="refl-compare-actions" class="is-hidden">
+        <label>&nbsp;</label>
+        <div class="btn-row">
+          <button type="button" class="btn primary" id="refl-add-series">Add series</button>
+          <button type="button" class="btn" id="refl-clear-series" disabled>Clear</button>
+        </div>
+      </div>
+      <div id="wp-date-mode-control" class="is-hidden">
+        <label>View</label>
+        <div class="mode-toggle" id="wp-mode-toggle">
+          <button type="button" class="active" data-mode="compare">Compare dates</button>
+          <button type="button" data-mode="range">Date range</button>
+        </div>
+      </div>
+      <div id="wp-range-from" class="is-hidden">
+        <label for="wp-from-date">From</label>
+        <input type="date" id="wp-from-date">
+      </div>
+      <div id="wp-range-to" class="is-hidden">
+        <label for="wp-to-date">To</label>
+        <input type="date" id="wp-to-date">
+      </div>
+      <div id="wp-filter-group" class="is-hidden">
+        <label>Date</label>
+        <div class="date-filter-group">
+          <select id="wp-year" aria-label="Predawn WP year">
+            <option value="">Year</option>
+          </select>
+          <select id="wp-month" aria-label="Predawn WP month">
+            <option value="">Month</option>
+          </select>
+          <select id="wp-day" aria-label="Predawn WP day">
+            <option value="">Day</option>
+          </select>
+        </div>
+      </div>
+      <div id="wp-compare-actions" class="is-hidden">
+        <label>&nbsp;</label>
+        <div class="btn-row">
+          <button type="button" class="btn primary" id="wp-add-series">Add series</button>
+          <button type="button" class="btn" id="wp-clear-series" disabled>Clear</button>
+        </div>
+      </div>
+      </div>
+    </div>
 
   <div id="data-records-block">
     <div id="weather-section">
-      <div class="section-title">Weather Records</div>
-      <div class="controls records-date-filter">
-        <div style="display:flex;flex-wrap:wrap;gap:16px;">
-          <div>
-            <label>From</label><br>
-            <div class="date-filter-group">
-              <select id="weather-from-month" aria-label="Weather from month">
-                <option value="">Month</option>
-              </select>
-              <select id="weather-from-day" aria-label="Weather from day">
-                <option value="">Day</option>
-              </select>
-            </div>
-          </div>
-          <div>
-            <label>To</label><br>
-            <div class="date-filter-group">
-              <select id="weather-to-month" aria-label="Weather to month">
-                <option value="">Month</option>
-              </select>
-              <select id="weather-to-day" aria-label="Weather to day">
-                <option value="">Day</option>
-              </select>
-            </div>
-          </div>
-          <div id="weather-metric-control">
-            <label for="weather-metric">Weather metric</label><br>
-            <select id="weather-metric"></select>
-          </div>
+      <div id="weather-single-view">
+        <div class="detail-panel" id="weather-detail">
+          <h4 id="weather-detail-title">—</h4>
+          <div id="weather-detail-rows"></div>
         </div>
       </div>
-      <div class="chart-box weather-chart-standalone" id="weather-chart-box">
-        <h3>Weather — daily time series</h3>
+      <div id="weather-range-label" class="range-label is-hidden"></div>
+      <div class="chart-box weather-chart-standalone is-hidden" id="weather-chart-box">
+        <h3 id="weather-chart-title">Weather — daily time series</h3>
         <div class="chart-canvas"><canvas id="weather-chart"></canvas></div>
       </div>
       <div id="weather-count" class="dataset-count"></div>
       <div id="weather-table" class="data-table"></div>
+      <div id="weather-table-footer" class="data-table-footer is-hidden">
+        <button type="button" class="btn" id="weather-download-csv">Download table (CSV)</button>
+        <button type="button" class="btn" id="weather-download-full-csv">Download full dataset (CSV)</button>
+      </div>
       <div id="weather-metadata" class="metadata-panel loading">Loading metadata…</div>
     </div>
 
     <div id="fluorescence-section">
-      <div class="section-title">Fluorescence Records</div>
-      <div class="controls records-date-filter">
-        <div style="display:flex;flex-wrap:wrap;gap:16px;">
-          <div>
-            <label>From</label><br>
-            <div class="date-filter-group">
-              <select id="fluor-from-month" aria-label="Fluorescence from month">
-                <option value="">Month</option>
-              </select>
-              <select id="fluor-from-day" aria-label="Fluorescence from day">
-                <option value="">Day</option>
-              </select>
-            </div>
-          </div>
-          <div>
-            <label>To</label><br>
-            <div class="date-filter-group">
-              <select id="fluor-to-month" aria-label="Fluorescence to month">
-                <option value="">Month</option>
-              </select>
-              <select id="fluor-to-day" aria-label="Fluorescence to day">
-                <option value="">Day</option>
-              </select>
-            </div>
-          </div>
-          <div id="fluor-metric-control">
-            <label for="fluor-metric">Fluorescence metric</label><br>
-            <select id="fluor-metric"></select>
-          </div>
-        </div>
+      <div class="series-chips" id="fluor-series-chips" aria-live="polite"></div>
+      <div class="compare-empty" id="fluor-compare-empty">
+        Choose a metric, site, and date, then click <strong>Add series</strong> to build a comparison chart.
       </div>
-      <div class="chart-box" id="fluorescence-chart-box">
-        <h3>Chlorophyll fluorescence — QY<sub>max</sub> &amp; NPQ</h3>
+      <div id="fluor-range-label" class="range-label is-hidden"></div>
+      <div class="chart-box is-hidden" id="fluorescence-chart-box">
+        <h3 id="fluorescence-chart-title">Chlorophyll fluorescence — site / date comparison</h3>
         <div class="chart-canvas"><canvas id="fluorescence-chart"></canvas></div>
       </div>
       <div id="fluorescence-count" class="dataset-count"></div>
       <div id="fluorescence-table" class="data-table"></div>
+      <div id="fluorescence-table-footer" class="data-table-footer is-hidden">
+        <button type="button" class="btn" id="fluorescence-download-csv">Download table (CSV)</button>
+        <button type="button" class="btn" id="fluorescence-download-full-csv">Download full dataset (CSV)</button>
+      </div>
       <div id="fluorescence-metadata" class="metadata-panel loading">Loading metadata…</div>
     </div>
 
     <div id="reflectance-section">
-      <div class="section-title">Reflectance Records</div>
-      <div class="controls records-date-filter">
-        <div style="display:flex;flex-wrap:wrap;gap:16px;">
-          <div>
-            <label>From</label><br>
-            <div class="date-filter-group">
-              <select id="refl-from-month" aria-label="Reflectance from month">
-                <option value="">Month</option>
-              </select>
-              <select id="refl-from-day" aria-label="Reflectance from day">
-                <option value="">Day</option>
-              </select>
-            </div>
-          </div>
-          <div>
-            <label>To</label><br>
-            <div class="date-filter-group">
-              <select id="refl-to-month" aria-label="Reflectance to month">
-                <option value="">Month</option>
-              </select>
-              <select id="refl-to-day" aria-label="Reflectance to day">
-                <option value="">Day</option>
-              </select>
-            </div>
-          </div>
-          <div id="refl-metric-control">
-            <label for="refl-metric">Reflectance metric</label><br>
-            <select id="refl-metric"></select>
-          </div>
-        </div>
+      <div class="series-chips" id="refl-series-chips" aria-live="polite"></div>
+      <div class="compare-empty" id="refl-compare-empty">
+        Choose a metric, site, and date, then click <strong>Add series</strong> to build a comparison chart.
       </div>
-      <div class="chart-box" id="reflectance-chart-box">
-        <h3>Vegetation indices — NDVI, PRI &amp; GNDVI</h3>
+      <div id="refl-range-label" class="range-label is-hidden"></div>
+      <div class="chart-box is-hidden" id="reflectance-chart-box">
+        <h3 id="reflectance-chart-title">Vegetation indices — site / date comparison</h3>
         <div class="chart-canvas"><canvas id="reflectance-chart"></canvas></div>
       </div>
       <div id="reflectance-count" class="dataset-count"></div>
       <div id="reflectance-table" class="data-table"></div>
+      <div id="reflectance-table-footer" class="data-table-footer is-hidden">
+        <button type="button" class="btn" id="reflectance-download-csv">Download table (CSV)</button>
+        <button type="button" class="btn" id="reflectance-download-full-csv">Download full dataset (CSV)</button>
+      </div>
       <div id="reflectance-metadata" class="metadata-panel loading">Loading metadata…</div>
     </div>
   </div>
 
   <div id="wp-section">
-    <div class="section-title">Predawn Water Potential Records</div>
-    <div class="controls records-date-filter">
-      <div style="display:flex;flex-wrap:wrap;gap:16px;">
-        <div>
-          <label>From</label><br>
-          <div class="date-filter-group">
-            <select id="wp-from-month" aria-label="WP from month">
-              <option value="">Month</option>
-            </select>
-            <select id="wp-from-day" aria-label="WP from day">
-              <option value="">Day</option>
-            </select>
-          </div>
-        </div>
-        <div>
-          <label>To</label><br>
-          <div class="date-filter-group">
-            <select id="wp-to-month" aria-label="WP to month">
-              <option value="">Month</option>
-            </select>
-            <select id="wp-to-day" aria-label="WP to day">
-              <option value="">Day</option>
-            </select>
-          </div>
-        </div>
-      </div>
+    <div class="series-chips" id="wp-series-chips" aria-live="polite"></div>
+    <div class="compare-empty" id="wp-compare-empty">
+      Choose a date, then click <strong>Add series</strong> to build a comparison chart.
     </div>
-    <div class="chart-box" id="wp-chart-box">
-      <h3>Predawn water potential by cluster</h3>
+    <div id="wp-range-label" class="range-label is-hidden"></div>
+    <div class="chart-box is-hidden" id="wp-chart-box">
+      <h3 id="wp-chart-title">Predawn Ψ — date comparison</h3>
       <div class="chart-canvas" id="wp-scatter"><canvas id="wp-chart"></canvas></div>
     </div>
     <div id="wp-count" class="dataset-count"></div>
-    <div id="summary-table"></div>
+    <div id="summary-table" class="data-table"></div>
+    <div id="wp-table-footer" class="data-table-footer is-hidden">
+      <button type="button" class="btn" id="wp-download-csv">Download table (CSV)</button>
+      <button type="button" class="btn" id="wp-download-full-csv">Download full dataset (CSV)</button>
+    </div>
+    <div id="wp-metadata" class="metadata-panel loading">Loading metadata…</div>
+  </div>
   </div>
 
 <script>
-const DATA_BASE = "./data/fastpheno/";
-const WEATHER_METRICS = [
+const DATA_BASE = (() => {
+  const authApi = location.port === "8000" || new URLSearchParams(location.search).has("auth");
+  return authApi ? "/api/data/fastpheno/" : "./data/fastpheno/";
+})();
+const AUTH_API_MODE = DATA_BASE.startsWith("/api/");
+
+function dataFetch(url) {
+  return fetch(url, AUTH_API_MODE ? { credentials: "include" } : {}).then(r => {
+    if (AUTH_API_MODE && r.status === 401) {
+      const next = encodeURIComponent(location.pathname + location.search + location.hash);
+      location.href = `/login?next=${next}`;
+      throw new Error("Unauthorized");
+    }
+    return r;
+  });
+}
+
+function ensureAuth() {
+  if (!AUTH_API_MODE) return Promise.resolve();
+  return fetch("/api/auth/me", { credentials: "include" }).then(r => {
+    if (!r.ok) {
+      const next = encodeURIComponent(location.pathname + location.search + location.hash);
+      location.href = `/login?next=${next}`;
+      throw new Error("Unauthorized");
+    }
+    return r.json();
+  });
+}
+const WEATHER_METRICS_ECCC = [
+  { field: "lat", label: "Latitude (°)", chartLabel: "Interpolated latitude (°)", minWidth: 100 },
+  { field: "lon", label: "Longitude (°)", chartLabel: "Interpolated longitude (°)", minWidth: 100 },
+  { field: "elev", label: "Elevation (m)", chartLabel: "Elevation (m)", minWidth: 100 },
   { field: "cool_deg_days", label: "Cooling degree days", chartLabel: "Cooling degree days", minWidth: 130 },
   { field: "wind_dir", label: "Wind direction (°)", chartLabel: "Wind direction (°)", minWidth: 120 },
   { field: "heat_deg_days", label: "Heating degree days", chartLabel: "Heating degree days", minWidth: 130 },
@@ -274,40 +548,126 @@ const WEATHER_METRICS = [
   { field: "mean_distance", label: "Mean distance (km)", chartLabel: "Mean station distance (km)", minWidth: 130 },
   { field: "site_lat", label: "Site latitude", chartLabel: "Site latitude", minWidth: 100 },
   { field: "site_lon", label: "Site longitude", chartLabel: "Site longitude", minWidth: 100 },
+  { field: "vpd", label: "VPD (kPa)", chartLabel: "Vapor pressure deficit (kPa)", minWidth: 110 },
   { field: "temp_interp", label: "Temp interpolated (°C)", chartLabel: "Interpolated temperature (°C)", minWidth: 140 },
   { field: "wind_spd_interp", label: "Wind speed interpolated (km/h)", chartLabel: "Interpolated wind speed (km/h)", minWidth: 160 },
 ];
+const WEATHER_METRICS_DAYMET = [
+  { field: "temp", label: "Mean temp (°C)", chartLabel: "Mean temperature (°C)", minWidth: 120 },
+  { field: "tmax_c", label: "Max temp (°C)", chartLabel: "Maximum temperature (°C)", minWidth: 120 },
+  { field: "tmin_c", label: "Min temp (°C)", chartLabel: "Minimum temperature (°C)", minWidth: 120 },
+  { field: "prcp_mm_day", label: "Precip (mm)", chartLabel: "Precipitation (mm)", minWidth: 110 },
+  { field: "vpd_kpa", label: "VPD (kPa)", chartLabel: "Vapor pressure deficit (kPa)", minWidth: 110 },
+  { field: "par_w_m2", label: "PAR (W/m²)", chartLabel: "PAR (W/m²)", minWidth: 110 },
+  { field: "par_mol_m2_day", label: "PAR integral (mol/m²/day)", chartLabel: "PAR integral (mol/m²/day)", minWidth: 150 },
+  { field: "srad_w_m2", label: "Shortwave rad (W/m²)", chartLabel: "Shortwave radiation (W/m²)", minWidth: 140 },
+  { field: "vp_Pa", label: "Vapor pressure (Pa)", chartLabel: "Vapor pressure (Pa)", minWidth: 130 },
+];
 const METRIC_ALL = "all";
-const FLUORESCENCE_METRICS = [
-  { field: "QY_max", label: "QY_max", chartLabel: "QY_max", minWidth: 100, decimals: 3, color: "#993366", yAxisID: "y" },
-  { field: "NPQ_Lss", label: "NPQ_Lss", chartLabel: "NPQ_Lss", minWidth: 100, decimals: 3, color: "#669933", yAxisID: "y1" },
+const CAMPAIGN_METRIC_COLORS = [
+  "#993366", "#669933", "#228B22", "#cc6600", "#4169E1", "#336633", "#cc3333",
+  "#996633", "#333399", "#2F4F4F", "#8B4513", "#4682B4", "#6A5ACD", "#C71585",
 ];
-const REFLECTANCE_METRICS = [
-  { field: "NDVI", label: "NDVI", chartLabel: "NDVI", minWidth: 100, decimals: 4, color: "#228B22", yAxisID: "y", yMin: 0, yMax: 1 },
-  { field: "PRI", label: "PRI", chartLabel: "PRI", minWidth: 100, decimals: 4, color: "#cc6600", yAxisID: "y1" },
-  { field: "GNDVI", label: "GNDVI", chartLabel: "GNDVI", minWidth: 100, decimals: 4, color: "#4169E1", yAxisID: "y", yMin: 0, yMax: 1 },
-];
+const TABLE_TEXT_FIELDS = new Set([
+  "site", "year", "date", "primary_key", "datetime_est", "sensor", "operator",
+  "Measurement_ID", "time_EST", "time_GMT", "time", "campaign", "sample",
+  "acquisition_time", "orientation", "measurement_number", "rank_within_tree",
+  "site_id", "Cluster", "Genotype",
+]);
+const TABLE_FROZEN_FIELDS = new Set(["site", "year", "date", "site_id"]);
 const WP_COLUMNS = [
-  { title: "Site", field: "site", width: 70 },
-  { title: "Date", field: "date", sorter: "date" },
+  { title: "Date", field: "date", sorter: "string", minWidth: 110 },
   { title: "Cluster", field: "Cluster", width: 80 },
   { title: "Genotype", field: "Genotype", width: 90 },
-  { title: "Predawn Ψ (MPa)", field: "wp_pd", sorter: "number", formatter: v => parseFloat(v.getValue()).toFixed(3) },
+  {
+    title: "Predawn Ψ (MPa)",
+    field: "wp_pd",
+    sorter: "number",
+    formatter: cell => {
+      const raw = cell.getValue();
+      if (raw == null || raw === "" || raw === "NA") return "—";
+      const v = parseFloat(raw);
+      return Number.isNaN(v) ? "—" : v.toFixed(3);
+    },
+    minWidth: 130,
+  },
 ];
-const DATE_FILTER_PREFIXES = ["weather", "fluor", "refl", "wp"];
-let weatherPIK = [], weatherPIN = [], reflectance = [], fluorescence = [], predawnWP = [];
+const COMPARE_COLORS = ["#336633", "#cc6600", "#4169E1", "#993366", "#2F4F4F"];
+const COMPARE_MAX_SERIES = 4;
+const COMPARE_KINDS = ["fluor", "refl", "wp"];
+const ERD_DOMAINS = {
+  uav: {
+    id: "uav",
+    title: "UAV",
+    blurb: "Airborne tree-level products keyed by primary_key (e.g. PIK_1001).",
+    entities: [
+      { id: "lidar", title: "LiDAR", desc: "Tree height, location, and structural metrics.", pk: "primary_key", available: false },
+      { id: "hyp_spec", title: "Hyp_spec", desc: "UAV hyperspectral reflectance.", pk: "primary_key", available: false },
+      { id: "gnss", title: "GNSS", desc: "Tree geolocation and GNSS metadata.", pk: "primary_key", available: false },
+    ],
+  },
+  ground: {
+    id: "ground",
+    title: "Ground Data",
+    blurb: "Ground campaigns linked by primary_key to the same trees.",
+    entities: [
+      { id: "fluorescence", title: "Fluorescence", desc: "Chlorophyll fluorescence (QY_max, NPQ, …).", pk: "primary_key", available: true, sensor: "fluorescence" },
+      { id: "leaf_reflectance", title: "Leaf_reflectance", desc: "Leaf / UniSpec vegetation indices.", pk: "primary_key", available: true, sensor: "reflectance" },
+      { id: "pigments", title: "Pigments", desc: "Leaf pigment concentrations.", pk: "primary_key", available: false },
+      { id: "tlp", title: "TLP", desc: "Turgor loss point / pressure–volume parameters.", pk: "primary_key", available: false },
+      { id: "wp", title: "WP", desc: "Predawn leaf water potential (Ψ).", pk: "primary_key", available: true, sensor: "wp" },
+      { id: "xylem_vulnerability", title: "Xylem_vulnerability", desc: "Xylem vulnerability curves.", pk: "primary_key", available: false },
+      { id: "xylem_anatomy", title: "Xylem_anatomy", desc: "Xylem anatomical traits.", pk: "primary_key", available: false },
+      { id: "gas_exchange", title: "Gas_exchange", desc: "Gas exchange and photosynthetic rates.", pk: "primary_key", available: false },
+    ],
+  },
+  environmental: {
+    id: "environmental",
+    title: "Environmental Data",
+    blurb: "Site-level climate and environment keyed by siteID.",
+    entities: [
+      { id: "climate", title: "Climate", desc: "Site climate / weather (current build: ECCC and Daymet daily).", pk: "siteID", available: true, sensor: "weather" },
+      { id: "soil_moisture", title: "Soil moisture", desc: "Soil moisture measurements.", pk: "siteID", available: false },
+      { id: "soil_texture", title: "Soil texture", desc: "Soil texture classes and related properties.", pk: "siteID", available: false },
+    ],
+  },
+};
+
+const SENSORS = {
+  weather: { title: "Climate", sectionId: "weather-section", hasData: () => hasWeatherData(), domain: "environmental", entity: "climate" },
+  fluorescence: { title: "Fluorescence", sectionId: "fluorescence-section", hasData: () => hasFluorescenceData(), domain: "ground", entity: "fluorescence" },
+  reflectance: { title: "Leaf_reflectance", sectionId: "reflectance-section", hasData: () => hasReflectanceData(), domain: "ground", entity: "leaf_reflectance" },
+  wp: { title: "WP", sectionId: "wp-section", hasData: () => hasWPData(), domain: "ground", entity: "wp" },
+};
+
+let activeDomain = null;
+let activeEntity = null;
+let activeSensor = null;
+let weatherEcccPIK = [], weatherEcccPIN = [], weatherDaymetPIK = [], weatherDaymetPIN = [];
+let reflectance = [], fluorescence = [], predawnWP = [];
+let reflectanceFieldOrder = [], fluorescenceFieldOrder = [];
 let charts = {};
 let weatherTable, fluorescenceTable, reflectanceTable, wpTable;
+let weatherDateMode = "single";
+let campaignDateMode = { fluor: "compare", refl: "compare", wp: "compare" };
+/** @type {{ fluor: {site?: string, date: string}[], refl: {site?: string, date: string}[], wp: {date: string}[] }} */
+let compareSeries = { fluor: [], refl: [], wp: [] };
 
-function loadCSV(path) {
-  return fetch(path).then(r => {
+function loadCSV(path, withFields = false) {
+  return dataFetch(path).then(r => {
     if (!r.ok) throw new Error("Failed to load " + path);
     return r.text();
-  }).then(text => Papa.parse(text, { header: true, skipEmptyLines: true, dynamicTyping: true }).data);
+  }).then(text => {
+    const parsed = Papa.parse(text, { header: true, skipEmptyLines: true, dynamicTyping: true });
+    if (withFields) {
+      return { data: parsed.data, fields: parsed.meta.fields || [] };
+    }
+    return parsed.data;
+  });
 }
 
 function loadMarkdown(path) {
-  return fetch(path).then(r => {
+  return dataFetch(path).then(r => {
     if (!r.ok) throw new Error("Failed to load " + path);
     return r.text();
   });
@@ -395,8 +755,6 @@ function markdownTableToHtml(tableLines) {
   return html;
 }
 
-function yearFromDate(d) { return d ? String(d).slice(0, 4) : ""; }
-
 function parseDateValue(d) {
   if (d == null || d === "") return null;
   if (d instanceof Date && !isNaN(d.getTime())) {
@@ -422,225 +780,1268 @@ function parseDateValue(d) {
 
 const MONTH_NAMES = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-function populateMonthDaySelects(prefixes = ["weather", "fluor", "refl", "wp"]) {
-  prefixes.forEach(prefix => {
-    [`${prefix}-from-month`, `${prefix}-to-month`].forEach(id => {
-      const sel = document.getElementById(id);
-      if (!sel) return;
-      for (let m = 1; m <= 12; m++) {
-        const opt = document.createElement("option");
-        opt.value = String(m);
-        opt.textContent = MONTH_NAMES[m];
-        sel.appendChild(opt);
-      }
-    });
-    [`${prefix}-from-day`, `${prefix}-to-day`].forEach(id => {
-      const sel = document.getElementById(id);
-      if (!sel) return;
-      for (let d = 1; d <= 31; d++) {
-        const opt = document.createElement("option");
-        opt.value = String(d);
-        opt.textContent = String(d);
-        sel.appendChild(opt);
-      }
+function getCampaignDate(prefix) {
+  const year = document.getElementById(`${prefix}-year`)?.value || "";
+  const month = document.getElementById(`${prefix}-month`)?.value || "";
+  const day = document.getElementById(`${prefix}-day`)?.value || "";
+  if (!year || !month || !day) return "";
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function getCompareDataset(kind) {
+  if (kind === "fluor") return fluorescence;
+  if (kind === "refl") return reflectance;
+  return predawnWP;
+}
+
+function compareUsesSite(kind) {
+  return kind === "fluor" || kind === "refl";
+}
+
+function compareSeriesKey(kind, series) {
+  return compareUsesSite(kind) ? `${series.site}__${series.date}` : series.date;
+}
+
+function getCompareSite(kind) {
+  if (!compareUsesSite(kind)) return null;
+  return document.getElementById(`${kind}-site`)?.value || "PIN";
+}
+
+function getAvailableCompareDates(kind) {
+  const site = getCompareSite(kind);
+  const used = new Set(
+    compareSeries[kind]
+      .filter(s => !compareUsesSite(kind) || s.site === site)
+      .map(s => s.date)
+  );
+  return [...new Set(
+    getCompareDataset(kind)
+      .filter(r => site == null || String(r.site || "").toUpperCase() === site)
+      .map(r => parseDateValue(r.date))
+      .filter(Boolean)
+  )]
+    .filter(d => !used.has(d))
+    .sort();
+}
+
+function shortCompareDateLabel(iso) {
+  if (!iso) return "—";
+  return new Date(iso + "T00:00:00").toLocaleDateString(undefined, {
+    month: "short", day: "numeric", year: "2-digit",
+  });
+}
+
+function compareSeriesLabel(kind, series) {
+  return compareUsesSite(kind)
+    ? `${series.site} · ${shortCompareDateLabel(series.date)}`
+    : shortCompareDateLabel(series.date);
+}
+
+function compareSeriesFullLabel(kind, series) {
+  return compareUsesSite(kind)
+    ? `${series.site} · ${formatWeatherDisplay(series.date)}`
+    : formatWeatherDisplay(series.date);
+}
+
+function populateCompareDateFilters(kind, { reset = false, cascadeFrom = null } = {}) {
+  const yearSel = document.getElementById(`${kind}-year`);
+  const monthSel = document.getElementById(`${kind}-month`);
+  const daySel = document.getElementById(`${kind}-day`);
+  const addBtn = document.getElementById(`${kind}-add-series`);
+  if (!yearSel || !monthSel || !daySel) return;
+
+  const dates = getAvailableCompareDates(kind);
+  const prevYear = reset ? "" : yearSel.value;
+  const prevMonth = reset || cascadeFrom === "year" ? "" : monthSel.value;
+  const prevDay = reset || cascadeFrom === "year" || cascadeFrom === "month" ? "" : daySel.value;
+
+  const years = [...new Set(dates.map(d => d.slice(0, 4)))].sort();
+  yearSel.innerHTML = years.length
+    ? years.map(y => `<option value="${y}">${y}</option>`).join("")
+    : '<option value="">No years</option>';
+  if (!years.length) {
+    yearSel.value = "";
+    monthSel.innerHTML = '<option value="">Month</option>';
+    monthSel.value = "";
+    daySel.innerHTML = '<option value="">Day</option>';
+    daySel.value = "";
+    if (addBtn) addBtn.disabled = true;
+    return;
+  }
+  yearSel.value = prevYear && years.includes(prevYear) ? prevYear : years[years.length - 1];
+
+  const year = yearSel.value;
+  const months = [...new Set(
+    dates.filter(d => d.startsWith(`${year}-`)).map(d => parseInt(d.slice(5, 7), 10))
+  )].sort((a, b) => a - b);
+  monthSel.innerHTML = months.length
+    ? months.map(m => `<option value="${m}">${MONTH_NAMES[m]}</option>`).join("")
+    : '<option value="">No months</option>';
+  if (!months.length) {
+    monthSel.value = "";
+    daySel.innerHTML = '<option value="">Day</option>';
+    daySel.value = "";
+    if (addBtn) addBtn.disabled = true;
+    return;
+  }
+  const monthNum = prevMonth && months.includes(parseInt(prevMonth, 10))
+    ? parseInt(prevMonth, 10)
+    : months[months.length - 1];
+  monthSel.value = String(monthNum);
+
+  const mm = String(monthNum).padStart(2, "0");
+  const days = [...new Set(
+    dates.filter(d => d.startsWith(`${year}-${mm}-`)).map(d => parseInt(d.slice(8, 10), 10))
+  )].sort((a, b) => a - b);
+  daySel.innerHTML = days.length
+    ? days.map(d => `<option value="${d}">${d}</option>`).join("")
+    : '<option value="">No days</option>';
+  if (!days.length) {
+    daySel.value = "";
+    if (addBtn) addBtn.disabled = true;
+    return;
+  }
+  const dayNum = prevDay && days.includes(parseInt(prevDay, 10))
+    ? parseInt(prevDay, 10)
+    : days[days.length - 1];
+  daySel.value = String(dayNum);
+  if (addBtn) addBtn.disabled = compareSeries[kind].length >= COMPARE_MAX_SERIES;
+}
+
+function syncCompareMetricLock(kind) {
+  const locked = compareSeries[kind].length > 0;
+  const metricSel = document.getElementById(`${kind}-metric`);
+  if (metricSel) metricSel.disabled = locked;
+  const clearBtn = document.getElementById(`${kind}-clear-series`);
+  if (clearBtn) clearBtn.disabled = !locked;
+}
+
+function renderCompareSeriesChips(kind) {
+  const wrap = document.getElementById(`${kind}-series-chips`);
+  if (!wrap) return;
+  wrap.innerHTML = compareSeries[kind].map((series, i) => `
+    <span class="series-chip" style="border-color:${COMPARE_COLORS[i % COMPARE_COLORS.length]}">
+      ${compareSeriesFullLabel(kind, series)}
+      <button type="button" data-remove="${compareSeriesKey(kind, series)}" aria-label="Remove ${compareSeriesFullLabel(kind, series)}">×</button>
+    </span>
+  `).join("");
+  wrap.querySelectorAll("button[data-remove]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      compareSeries[kind] = compareSeries[kind].filter(
+        s => compareSeriesKey(kind, s) !== btn.dataset.remove
+      );
+      refreshCompareSection(kind);
     });
   });
 }
 
-function monthDayOrdinal(month, day) {
-  if (!month || !day) return null;
-  return parseInt(month, 10) * 100 + parseInt(day, 10);
+function addCompareSeries(kind) {
+  const date = getCampaignDate(kind);
+  if (!date) return;
+  const next = compareUsesSite(kind)
+    ? { site: getCompareSite(kind), date }
+    : { date };
+  if (compareSeries[kind].some(s => compareSeriesKey(kind, s) === compareSeriesKey(kind, next))) return;
+  if (compareSeries[kind].length >= COMPARE_MAX_SERIES) return;
+  compareSeries[kind] = [...compareSeries[kind], next];
+  refreshCompareSection(kind);
 }
 
-function parseMonthDay(dateStr) {
-  const normalized = parseDateValue(dateStr);
-  if (!normalized) return null;
-  const parts = normalized.split("-");
-  return { month: parseInt(parts[1], 10), day: parseInt(parts[2], 10) };
+function clearCompareSeries(kind) {
+  compareSeries[kind] = [];
+  refreshCompareSection(kind);
 }
 
-function getMonthDayFilterBounds(prefix) {
-  const fromMonth = document.getElementById(`${prefix}-from-month`).value;
-  const fromDay = document.getElementById(`${prefix}-from-day`).value;
-  const toMonth = document.getElementById(`${prefix}-to-month`).value;
-  const toDay = document.getElementById(`${prefix}-to-day`).value;
-  return { fromMonth, fromDay, toMonth, toDay };
+function refreshCompareSection(kind) {
+  if (kind === "fluor") updateFluorescenceSection();
+  else if (kind === "refl") updateReflectanceSection();
+  else updateWPSection();
 }
 
-function formatMonthDayLabel(month, day) {
-  if (!month || !day) return null;
-  return `${MONTH_NAMES[parseInt(month, 10)]} ${parseInt(day, 10)}`;
+function getCompareRows(kind) {
+  const seriesList = compareSeries[kind];
+  if (!seriesList.length) return [];
+  const data = getCompareDataset(kind);
+  return seriesList.flatMap(series => data.filter(r => {
+    if (compareUsesSite(kind) && String(r.site || "").toUpperCase() !== series.site) return false;
+    return parseDateValue(r.date) === series.date;
+  }));
 }
 
-function hasDateFilter(prefix) {
-  const { fromMonth, fromDay, toMonth, toDay } = getMonthDayFilterBounds(prefix);
-  return !!(fromMonth || fromDay || toMonth || toDay);
+function formatCompareCount(kind, count, label) {
+  if (!compareSeries[kind].length) return "";
+  const parts = compareSeries[kind].map(s => compareSeriesLabel(kind, s));
+  return `${count} ${label}${count === 1 ? "" : "s"} · ${parts.join(" · ")}`;
 }
 
-function matchesDateRange(row, dateField, prefix) {
-  const { fromMonth, fromDay, toMonth, toDay } = getMonthDayFilterBounds(prefix);
-  if (!fromMonth && !fromDay && !toMonth && !toDay) return true;
+function buildCompareChartGroups(kind, metric) {
+  return compareSeries[kind].map((series, index) => {
+    const rows = getCompareDataset(kind).filter(r => {
+      if (compareUsesSite(kind) && String(r.site || "").toUpperCase() !== series.site) return false;
+      return parseDateValue(r.date) === series.date;
+    });
+    const points = rows.map((row, pointIndex) => ({
+      y: parseMetricValue(row[metric.field]),
+      label: row.primary_key || row.sample || row.Measurement_ID
+        || (row.Genotype != null && row.Genotype !== "" ? `Genotype ${row.Genotype}` : null)
+        || `measurement ${pointIndex + 1}`,
+    })).filter(point => point.y != null);
+    const stats = computeBoxStats(points.map(point => point.y));
+    if (!stats || !points.length) return null;
+    return {
+      metric: {
+        field: metric.field,
+        label: compareSeriesLabel(kind, series),
+        color: COMPARE_COLORS[index % COMPARE_COLORS.length],
+        decimals: metric.decimals ?? 4,
+      },
+      groupIndex: index,
+      stats,
+      points,
+    };
+  }).filter(Boolean).map((group, index) => ({ ...group, groupIndex: index }));
+}
 
-  const md = parseMonthDay(row[dateField]);
-  if (!md) return false;
-  const rowOrd = monthDayOrdinal(md.month, md.day);
 
-  const fromOrd = (fromMonth && fromDay) ? monthDayOrdinal(fromMonth, fromDay) : null;
-  const toOrd = (toMonth && toDay) ? monthDayOrdinal(toMonth, toDay) : null;
-
-  if (fromOrd != null && toOrd != null) {
-    if (fromOrd <= toOrd) return rowOrd >= fromOrd && rowOrd <= toOrd;
-    return rowOrd >= fromOrd || rowOrd <= toOrd;
-  }
-  if (fromOrd != null) return rowOrd >= fromOrd;
-  if (toOrd != null) return rowOrd <= toOrd;
-
-  if (fromMonth && !fromDay) return md.month === parseInt(fromMonth, 10);
-  if (toMonth && !toDay) return md.month === parseInt(toMonth, 10);
-  if (fromDay && !fromMonth) return md.day === parseInt(fromDay, 10);
-  if (toDay && !toMonth) return md.day === parseInt(toDay, 10);
+function isValidWeatherMetricValue(v) {
+  if (v == null || v === "" || v === "NA") return false;
+  if (typeof v === "number" && Number.isNaN(v)) return false;
   return true;
 }
 
-function getDateFilterBounds(prefix) {
-  const { fromMonth, fromDay, toMonth, toDay } = getMonthDayFilterBounds(prefix);
-  const from = formatMonthDayLabel(fromMonth, fromDay);
-  const to = formatMonthDayLabel(toMonth, toDay);
-  return { from, to };
+const SITE_METADATA_FIELDS = new Set([
+  "site_lat", "site_lon", "lat", "lon", "elev", "n_stations", "mean_distance",
+]);
+
+function normalizeMetricValue(v) {
+  if (!isValidWeatherMetricValue(v)) return null;
+  const n = typeof v === "number" ? v : parseFloat(v);
+  if (!Number.isFinite(n)) return String(v);
+  return Math.round(n * 10000) / 10000;
 }
 
-function filterBySiteYear(rows, siteField, dateField) {
-  const site = document.getElementById("site-filter").value;
-  const year = document.getElementById("year-filter").value;
-  return rows.filter(r => {
-    const s = (r[siteField] || "").toUpperCase();
-    const y = yearFromDate(r[dateField]);
-    if (site !== "all" && s !== site) return false;
-    if (year !== "all" && y !== year) return false;
+function isMetricConstantForSite(rows, field) {
+  const values = new Set();
+  for (const row of rows) {
+    const norm = normalizeMetricValue(row[field]);
+    if (norm != null) values.add(norm);
+    if (values.size > 1) return false;
+  }
+  return true;
+}
+
+function isMetricRedundantDuplicate(rows, field, otherField) {
+  for (const row of rows) {
+    const a = normalizeMetricValue(row[field]);
+    const b = normalizeMetricValue(row[otherField]);
+    if (a == null && b == null) continue;
+    if (a !== b) return false;
+  }
+  return true;
+}
+
+function getCampaignMetricSiteGroups(rows, siteField = "site") {
+  const siteFilter = document.getElementById("site-filter").value;
+  if (siteFilter !== "all") return new Map([[siteFilter, rows]]);
+  const bySite = new Map();
+  for (const row of rows) {
+    const site = (row[siteField] || "").toUpperCase();
+    if (!bySite.has(site)) bySite.set(site, []);
+    bySite.get(site).push(row);
+  }
+  return bySite;
+}
+
+function getNumericMetricFields(fieldOrder) {
+  return (fieldOrder || []).filter(field => !TABLE_TEXT_FIELDS.has(field));
+}
+
+function buildCampaignMetricDef(field, index) {
+  return {
+    field,
+    label: field,
+    chartLabel: field,
+    minWidth: 90,
+    decimals: /^(QY|NPQ|Qp|Fo|Fm|Fp|Ft|Rfd)/.test(field) ? 3 : 4,
+    color: CAMPAIGN_METRIC_COLORS[index % CAMPAIGN_METRIC_COLORS.length],
+  };
+}
+
+function getVariableCampaignMetrics(rows, fieldOrder) {
+  const candidates = getNumericMetricFields(fieldOrder).map((field, index) => buildCampaignMetricDef(field, index));
+  if (!rows.length) return candidates;
+  const groups = getCampaignMetricSiteGroups(rows);
+  return candidates.filter(metric => {
+    for (const siteRows of groups.values()) {
+      if (!isMetricConstantForSite(siteRows, metric.field)) return true;
+    }
+    return false;
+  });
+}
+
+function getVariableFluorescenceChartMetrics() {
+  return getVariableCampaignMetrics(fluorescence, fluorescenceFieldOrder);
+}
+
+function getVariableReflectanceChartMetrics() {
+  return getVariableCampaignMetrics(reflectance, reflectanceFieldOrder);
+}
+
+function getWeatherMetricSiteGroups(rows) {
+  const siteFilter = document.getElementById("site-filter").value;
+  if (siteFilter !== "all") return new Map([[siteFilter, rows]]);
+  const bySite = new Map();
+  for (const row of rows) {
+    const site = (row.site_id || "").toUpperCase();
+    if (!bySite.has(site)) bySite.set(site, []);
+    bySite.get(site).push(row);
+  }
+  return bySite;
+}
+
+function getVariableWeatherMetrics(rows, metrics) {
+  if (!rows.length || !metrics.length) return metrics;
+  const groups = getWeatherMetricSiteGroups(rows);
+  const variable = metrics.filter(m => {
+    if (SITE_METADATA_FIELDS.has(m.field)) return false;
+    for (const siteRows of groups.values()) {
+      if (!isMetricConstantForSite(siteRows, m.field)) return true;
+    }
+    return false;
+  });
+  return variable.filter(m => {
+    for (const other of metrics) {
+      if (other.field === m.field) continue;
+      if (!m.field.endsWith("_interp")) continue;
+      const baseField = m.field.slice(0, -"_interp".length);
+      if (other.field !== baseField) continue;
+      let duplicate = true;
+      for (const siteRows of groups.values()) {
+        if (!isMetricRedundantDuplicate(siteRows, m.field, other.field)) {
+          duplicate = false;
+          break;
+        }
+      }
+      if (duplicate) return false;
+    }
     return true;
   });
 }
 
-function filterSubsetRows(rows, siteField, dateField, prefix) {
-  return filterBySiteYear(rows, siteField, dateField).filter(r => matchesDateRange(r, dateField, prefix));
+function getVariableWeatherMetricsForCurrentData() {
+  return getVariableWeatherMetrics(getWeatherBaseRows(), getWeatherMetrics());
+}
+
+function formatWeatherDetailValue(raw) {
+  const v = weatherValue(raw);
+  if (v == null) return "—";
+  if (Number.isInteger(v)) return String(v);
+  const a = Math.abs(v);
+  if (a >= 1000) return v.toFixed(0);
+  if (a >= 100) return v.toFixed(1);
+  if (a >= 1) return v.toFixed(2);
+  return v.toFixed(3);
+}
+
+function formatWeatherDisplay(dateStr) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  return dt.toLocaleDateString("en-CA", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+}
+
+function getWeatherBaseRows() {
+  return [...filterBySite(getActiveWeatherPIK(), "site_id"), ...filterBySite(getActiveWeatherPIN(), "site_id")]
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function getWeatherAvailableDates() {
+  return [...new Set(getWeatherBaseRows().map(r => r.date))].sort();
+}
+
+function getWeatherDateBounds() {
+  const rows = getWeatherBaseRows();
+  if (!rows.length) return null;
+  return { first: rows[0].date, last: rows[rows.length - 1].date };
+}
+
+function addCalendarDay(dateStr) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(y, m - 1, d + 1);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+}
+
+function getNextWeatherDateAfter(dateStr) {
+  return getWeatherAvailableDates().find(d => d > dateStr) || null;
+}
+
+function getPrevWeatherDateBefore(dateStr, dates = getWeatherAvailableDates()) {
+  for (let i = dates.length - 1; i >= 0; i--) {
+    if (dates[i] < dateStr) return dates[i];
+  }
+  return null;
+}
+
+function getMinValidWeatherTo(fromDate, last) {
+  const nextInData = getNextWeatherDateAfter(fromDate);
+  if (nextInData && nextInData <= last) return nextInData;
+  const nextCal = addCalendarDay(fromDate);
+  if (nextCal <= last) return nextCal;
+  return null;
+}
+
+function getWeatherToMinDate(fromDate, first, last) {
+  if (!fromDate) return first;
+  return getMinValidWeatherTo(fromDate, last) || last;
+}
+
+function getWeatherFromMaxDate(toDate, first) {
+  if (!toDate) return null;
+  return getPrevWeatherDateBefore(toDate) || first;
+}
+
+function enforceWeatherDateRange(changed = null) {
+  const bounds = getWeatherDateBounds();
+  const fromInput = document.getElementById("weather-from-date");
+  const toInput = document.getElementById("weather-to-date");
+  if (!bounds || !fromInput || !toInput) return false;
+
+  const { first, last } = bounds;
+  let adjusted = false;
+
+  if (fromInput.value && fromInput.value < first) { fromInput.value = first; adjusted = true; }
+  if (fromInput.value && fromInput.value > last) { fromInput.value = last; adjusted = true; }
+  if (toInput.value && toInput.value < first) { toInput.value = first; adjusted = true; }
+  if (toInput.value && toInput.value > last) { toInput.value = last; adjusted = true; }
+
+  fromInput.min = first;
+  toInput.max = last;
+
+  const invalidRange = () => fromInput.value && toInput.value && toInput.value <= fromInput.value;
+
+  if (changed === "from" && invalidRange()) {
+    const minTo = getMinValidWeatherTo(fromInput.value, last);
+    if (minTo) {
+      toInput.value = minTo;
+    } else {
+      const prevFrom = getPrevWeatherDateBefore(last);
+      if (prevFrom) {
+        fromInput.value = prevFrom;
+        toInput.value = last;
+      } else {
+        toInput.value = "";
+      }
+    }
+    adjusted = true;
+  } else if (changed === "to" && invalidRange()) {
+    const prevFrom = getPrevWeatherDateBefore(toInput.value);
+    if (prevFrom) {
+      fromInput.value = prevFrom;
+    } else {
+      const minTo = fromInput.value ? getMinValidWeatherTo(fromInput.value, last) : null;
+      if (minTo) {
+        toInput.value = minTo;
+      } else {
+        const prev = fromInput.value ? getPrevWeatherDateBefore(fromInput.value) : null;
+        if (prev) {
+          fromInput.value = prev;
+          toInput.value = getMinValidWeatherTo(prev, last) || last;
+        } else {
+          toInput.value = "";
+        }
+      }
+    }
+    adjusted = true;
+  } else if (!changed && invalidRange()) {
+    const minTo = getMinValidWeatherTo(fromInput.value, last);
+    if (minTo) {
+      toInput.value = minTo;
+    } else {
+      const prevFrom = getPrevWeatherDateBefore(last);
+      if (prevFrom) {
+        fromInput.value = prevFrom;
+        toInput.value = last;
+      } else {
+        toInput.value = "";
+      }
+    }
+    adjusted = true;
+  }
+
+  toInput.min = getWeatherToMinDate(fromInput.value, first, last);
+  fromInput.max = getWeatherFromMaxDate(toInput.value, first) || last;
+  return adjusted;
+}
+
+function syncWeatherDateInputs(reset = false) {
+  const rows = getWeatherBaseRows();
+  const dateInput = document.getElementById("weather-date");
+  const fromInput = document.getElementById("weather-from-date");
+  const toInput = document.getElementById("weather-to-date");
+  if (!rows.length) {
+    [dateInput, fromInput, toInput].forEach(el => { if (el) { el.min = ""; el.max = ""; el.value = ""; } });
+    return;
+  }
+  const first = rows[0].date;
+  const last = rows[rows.length - 1].date;
+  const mid = rows[Math.floor(rows.length / 2)].date;
+  [dateInput, fromInput, toInput].forEach(el => {
+    if (el) { el.min = first; el.max = last; }
+  });
+  if (reset || !dateInput.value || dateInput.value < first || dateInput.value > last) {
+    dateInput.value = mid;
+  }
+  if (reset || !fromInput.value || fromInput.value < first || fromInput.value > last) {
+    fromInput.value = rows[Math.max(0, rows.length - 14)].date;
+  }
+  if (reset || !toInput.value || toInput.value < first || toInput.value > last) {
+    toInput.value = last;
+  }
+  enforceWeatherDateRange();
+}
+
+function updateWeatherDateModeUI() {
+  const isSingle = weatherDateMode === "single";
+  setVisible("weather-single-controls", isSingle);
+  setVisible("weather-range-from", !isSingle);
+  setVisible("weather-range-to", !isSingle);
+  if (activeSensor === "weather") {
+    setVisible("weather-metric-control", !isSingle);
+  }
+}
+
+function matchesWeatherDateFilter(row, dateField) {
+  const date = parseDateValue(row[dateField]);
+  if (!date) return false;
+  if (weatherDateMode === "single") {
+    const single = document.getElementById("weather-date").value;
+    if (!single) return true;
+    return date === single;
+  }
+  const from = document.getElementById("weather-from-date").value;
+  const to = document.getElementById("weather-to-date").value;
+  if (!from && !to) return true;
+  const lo = from && to ? (from <= to ? from : to) : (from || to);
+  const hi = from && to ? (from <= to ? to : from) : (from || to);
+  return date >= lo && date <= hi;
+}
+
+function formatWeatherDatasetCount(count) {
+  let rangeLabel = "";
+  if (weatherDateMode === "single") {
+    const d = document.getElementById("weather-date").value;
+    if (d) rangeLabel = ` (${formatWeatherDisplay(d)})`;
+  } else {
+    const from = document.getElementById("weather-from-date").value;
+    const to = document.getElementById("weather-to-date").value;
+    if (from && to) rangeLabel = ` (${from} – ${to})`;
+    else if (from) rangeLabel = ` (from ${from})`;
+    else if (to) rangeLabel = ` (through ${to})`;
+  }
+  return `${count} weather row${count === 1 ? "" : "s"}${rangeLabel}`;
+}
+
+function isCampaignRangeMode(kind) {
+  return campaignDateMode[kind] === "range";
+}
+
+function getCampaignBaseRows(kind) {
+  if (kind === "wp") {
+    return predawnWP
+      .slice()
+      .sort((a, b) => (parseDateValue(a.date) || "").localeCompare(parseDateValue(b.date) || ""));
+  }
+  const site = getCompareSite(kind);
+  return getCompareDataset(kind)
+    .filter(r => String(r.site || "").toUpperCase() === site)
+    .slice()
+    .sort((a, b) => (parseDateValue(a.date) || "").localeCompare(parseDateValue(b.date) || ""));
+}
+
+function getCampaignDateBounds(kind) {
+  const dates = [...new Set(getCampaignBaseRows(kind).map(r => parseDateValue(r.date)).filter(Boolean))].sort();
+  if (!dates.length) return null;
+  return { first: dates[0], last: dates[dates.length - 1], dates };
+}
+
+function getCampaignAvailableDates(kind) {
+  return getCampaignDateBounds(kind)?.dates || [];
+}
+
+function enforceCampaignDateRange(kind, changed = null) {
+  const bounds = getCampaignDateBounds(kind);
+  const fromInput = document.getElementById(`${kind}-from-date`);
+  const toInput = document.getElementById(`${kind}-to-date`);
+  if (!bounds || !fromInput || !toInput) return false;
+
+  const { first, last } = bounds;
+  let adjusted = false;
+
+  if (fromInput.value && fromInput.value < first) { fromInput.value = first; adjusted = true; }
+  if (fromInput.value && fromInput.value > last) { fromInput.value = last; adjusted = true; }
+  if (toInput.value && toInput.value < first) { toInput.value = first; adjusted = true; }
+  if (toInput.value && toInput.value > last) { toInput.value = last; adjusted = true; }
+
+  fromInput.min = first;
+  toInput.max = last;
+
+  const invalidRange = () => fromInput.value && toInput.value && toInput.value <= fromInput.value;
+
+  if (changed === "from" && invalidRange()) {
+    const minTo = getWeatherToMinDate(fromInput.value, first, last);
+    toInput.value = minTo || last;
+    adjusted = true;
+  } else if (changed === "to" && invalidRange()) {
+    const prevFrom = getPrevWeatherDateBefore(toInput.value, getCampaignAvailableDates(kind));
+    fromInput.value = prevFrom || first;
+    adjusted = true;
+  } else if (!changed && invalidRange()) {
+    const minTo = getWeatherToMinDate(fromInput.value, first, last);
+    toInput.value = minTo || last;
+    adjusted = true;
+  }
+
+  toInput.min = getWeatherToMinDate(fromInput.value, first, last);
+  fromInput.max = getWeatherFromMaxDate(toInput.value, first) || last;
+  return adjusted;
+}
+
+function syncCampaignDateInputs(kind, reset = false) {
+  const bounds = getCampaignDateBounds(kind);
+  const fromInput = document.getElementById(`${kind}-from-date`);
+  const toInput = document.getElementById(`${kind}-to-date`);
+  if (!bounds || !fromInput || !toInput) {
+    [fromInput, toInput].forEach(el => { if (el) { el.min = ""; el.max = ""; el.value = ""; } });
+    return;
+  }
+  const { first, last, dates } = bounds;
+  [fromInput, toInput].forEach(el => { if (el) { el.min = first; el.max = last; } });
+  const defaultFrom = dates[Math.max(0, dates.length - 14)] || first;
+  if (reset || !fromInput.value || fromInput.value < first || fromInput.value > last) {
+    fromInput.value = defaultFrom;
+  }
+  if (reset || !toInput.value || toInput.value < first || toInput.value > last) {
+    toInput.value = last;
+  }
+  enforceCampaignDateRange(kind);
+}
+
+const CAMPAIGN_ACTIVE_SENSOR = { fluor: "fluorescence", refl: "reflectance", wp: "wp" };
+
+function updateCampaignDateModeUI(kind) {
+  const sensor = CAMPAIGN_ACTIVE_SENSOR[kind];
+  const isRange = isCampaignRangeMode(kind);
+  setVisible(`${kind}-filter-group`, activeSensor === sensor && !isRange);
+  setVisible(`${kind}-compare-actions`, activeSensor === sensor && !isRange);
+  setVisible(`${kind}-range-from`, activeSensor === sensor && isRange);
+  setVisible(`${kind}-range-to`, activeSensor === sensor && isRange);
+}
+
+function matchesCampaignDateFilter(kind, row) {
+  const date = parseDateValue(row.date);
+  if (!date) return false;
+  const from = document.getElementById(`${kind}-from-date`)?.value || "";
+  const to = document.getElementById(`${kind}-to-date`)?.value || "";
+  if (!from && !to) return true;
+  const lo = from && to ? (from <= to ? from : to) : (from || to);
+  const hi = from && to ? (from <= to ? to : from) : (from || to);
+  return date >= lo && date <= hi;
+}
+
+function getCampaignRangeRows(kind) {
+  return getCampaignBaseRows(kind).filter(row => matchesCampaignDateFilter(kind, row));
+}
+
+function formatCampaignRangeCount(kind, count) {
+  const labels = { fluor: "fluorescence", refl: "reflectance", wp: "water potential" };
+  const from = document.getElementById(`${kind}-from-date`)?.value || "";
+  const to = document.getElementById(`${kind}-to-date`)?.value || "";
+  let rangeLabel = "";
+  if (from && to) rangeLabel = ` (${from} – ${to})`;
+  else if (from) rangeLabel = ` (from ${from})`;
+  else if (to) rangeLabel = ` (through ${to})`;
+  const sitePart = compareUsesSite(kind) ? ` · ${getCompareSite(kind)}` : "";
+  return `${count} ${labels[kind]} row${count === 1 ? "" : "s"}${sitePart}${rangeLabel}`;
+}
+
+function aggregateCampaignDailyMeans(rows, metricField) {
+  const byDate = new Map();
+  rows.forEach(row => {
+    const date = parseDateValue(row.date);
+    const value = parseMetricValue(row[metricField]);
+    if (!date || value == null) return;
+    if (!byDate.has(date)) byDate.set(date, []);
+    byDate.get(date).push(value);
+  });
+  return [...byDate.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([date, values]) => ({
+      date,
+      mean: values.reduce((sum, v) => sum + v, 0) / values.length,
+      n: values.length,
+    }));
+}
+
+function getCampaignRangeMetric(kind) {
+  if (kind === "wp") {
+    return { field: "wp_pd", label: "Predawn Ψ", chartLabel: "Predawn Ψ (MPa)", decimals: 3 };
+  }
+  const metrics = kind === "fluor" ? getVariableFluorescenceChartMetrics() : getVariableReflectanceChartMetrics();
+  const field = document.getElementById(`${kind}-metric`).value;
+  return metrics.find(m => m.field === field) || metrics[0];
+}
+
+function getCampaignRangeDownloadFilename(kind) {
+  const prefixes = { fluor: "fluorescence", refl: "reflectance", wp: "predawn_wp" };
+  const from = document.getElementById(`${kind}-from-date`)?.value || "";
+  const to = document.getElementById(`${kind}-to-date`)?.value || "";
+  const range = from && to ? `_${from}_to_${to}` : "";
+  const sitePart = compareUsesSite(kind) ? `_${getCompareSite(kind)}` : "";
+  return `${prefixes[kind]}${sitePart}${range}.csv`;
+}
+
+function getWPRangeTableColumns() {
+  const fields = predawnWP[0] ? Object.keys(predawnWP[0]) : ["site", "date", "Cluster", "Genotype", "wp_pd"];
+  return buildDataTableColumns(fields);
+}
+
+function updateCampaignRangeChart(kind, rows) {
+  const chartKey = { fluor: "fluorescence", refl: "reflectance", wp: "wp" }[kind];
+  const canvasId = { fluor: "fluorescence-chart", refl: "reflectance-chart", wp: "wp-chart" }[kind];
+  const titleId = { fluor: "fluorescence-chart-title", refl: "reflectance-chart-title", wp: "wp-chart-title" }[kind];
+  destroyChart(chartKey);
+  if (!rows?.length) return;
+  const metric = getCampaignRangeMetric(kind);
+  if (!metric) return;
+  const daily = aggregateCampaignDailyMeans(rows, metric.field);
+  if (!daily.length) return;
+  const site = compareUsesSite(kind) ? getCompareSite(kind) : null;
+  const titleEl = document.getElementById(titleId);
+  if (titleEl) {
+    titleEl.textContent = site
+      ? `${metric.chartLabel || metric.label} — ${site} daily mean`
+      : `${metric.chartLabel || metric.label} — daily mean`;
+  }
+  const ctx = document.getElementById(canvasId);
+  charts[chartKey] = new Chart(ctx, {
+    type: "line",
+    data: {
+      datasets: [{
+        label: site ? `${site} daily mean` : "Daily mean",
+        data: daily.map(point => ({ x: point.date, y: point.mean })),
+        borderColor: "#336633",
+        backgroundColor: "rgba(51,102,51,0.1)",
+        tension: 0.2,
+        pointRadius: 3,
+        borderWidth: 1.5,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { type: "category", ticks: { maxTicksLimit: 12, font: { size: 9 } } },
+        y: { title: { display: true, text: metric.chartLabel || metric.label, font: { size: 9 } }, ticks: { font: { size: 9 } } },
+      },
+      plugins: { legend: { labels: { font: { size: 9 } } }, tooltip: {
+        callbacks: {
+          afterLabel(ctx) {
+            const point = daily[ctx.dataIndex];
+            return point ? `n = ${point.n} trees` : "";
+          },
+        },
+      } },
+    },
+  });
+}
+
+function updateCampaignSection(kind) {
+  const config = {
+    fluor: {
+      hasData: hasFluorescenceData,
+      countId: "fluorescence-count",
+      rangeLabelId: "fluor-range-label",
+      chartBoxId: "fluorescence-chart-box",
+      footerId: "fluorescence-table-footer",
+      tableVisibleId: "fluorescence-table",
+      chipsId: "fluor-series-chips",
+      emptyId: "fluor-compare-empty",
+      chartKey: "fluorescence",
+      rowLabel: "fluorescence row",
+      getTableColumns: getFluorescenceTableColumns,
+      tableSelector: "#fluorescence-table",
+      getTable: () => fluorescenceTable,
+      setTable: t => { fluorescenceTable = t; },
+      updateCompareChart: updateFluorescenceCompareChart,
+    },
+    refl: {
+      hasData: hasReflectanceData,
+      countId: "reflectance-count",
+      rangeLabelId: "refl-range-label",
+      chartBoxId: "reflectance-chart-box",
+      footerId: "reflectance-table-footer",
+      tableVisibleId: "reflectance-table",
+      chipsId: "refl-series-chips",
+      emptyId: "refl-compare-empty",
+      chartKey: "reflectance",
+      rowLabel: "reflectance row",
+      getTableColumns: getReflectanceTableColumns,
+      tableSelector: "#reflectance-table",
+      getTable: () => reflectanceTable,
+      setTable: t => { reflectanceTable = t; },
+      updateCompareChart: updateReflectanceCompareChart,
+    },
+    wp: {
+      hasData: hasWPData,
+      countId: "wp-count",
+      rangeLabelId: "wp-range-label",
+      chartBoxId: "wp-chart-box",
+      footerId: "wp-table-footer",
+      tableVisibleId: "summary-table",
+      chipsId: "wp-series-chips",
+      emptyId: "wp-compare-empty",
+      chartKey: "wp",
+      rowLabel: "water potential row",
+      getTableColumns: getWPRangeTableColumns,
+      tableSelector: "#summary-table",
+      getTable: () => wpTable,
+      setTable: t => { wpTable = t; },
+      updateCompareChart: updateWPCompareChart,
+    },
+  }[kind];
+
+  if (!config.hasData()) return;
+
+  if (isCampaignRangeMode(kind)) {
+    syncCampaignDateInputs(kind);
+    const rows = getCampaignRangeRows(kind);
+    const hasRows = rows.length > 0;
+
+    setVisible(config.chipsId, false);
+    setVisible(config.emptyId, false);
+    setVisible(config.rangeLabelId, true);
+    setVisible(config.chartBoxId, hasRows);
+    setVisible(config.footerId, true);
+    setVisible(config.countId, hasRows);
+    setVisible(config.tableVisibleId, hasRows);
+
+    if (!hasRows) {
+      destroyChart(config.chartKey);
+      document.getElementById(config.rangeLabelId).textContent = "No measurements in range";
+      document.getElementById(config.countId).textContent = "";
+      const table = config.getTable();
+      if (table) table.setData([]);
+      return;
+    }
+
+    const uniqueDates = [...new Set(rows.map(r => parseDateValue(r.date)).filter(Boolean))].sort();
+    document.getElementById(config.rangeLabelId).textContent = uniqueDates.length
+      ? `${uniqueDates.length} days · ${uniqueDates[0]} to ${uniqueDates[uniqueDates.length - 1]}`
+      : "No days in range";
+    document.getElementById(config.countId).textContent = formatCampaignRangeCount(kind, rows.length);
+    updateCampaignRangeChart(kind, rows);
+
+    if (kind === "wp") {
+      const table = config.getTable();
+      const cols = config.getTableColumns();
+      if (table) {
+        table.setColumns(cols);
+        table.setData(rows);
+      } else {
+        config.setTable(new Tabulator(config.tableSelector, {
+          data: rows,
+          layout: "fitColumns",
+          pagination: true,
+          paginationSize: 15,
+          columns: cols,
+        }));
+      }
+    } else {
+      config.setTable(initMetricSubsetTable(
+        config.getTable(),
+        config.tableSelector,
+        config.getTableColumns,
+        () => getCampaignRangeRows(kind)
+      ));
+    }
+    return;
+  }
+
+  const rows = getCompareRows(kind);
+  const hasSeries = compareSeries[kind].length > 0;
+  const hasRows = rows.length > 0;
+  syncCompareMetricLock(kind);
+  renderCompareSeriesChips(kind);
+  populateCompareDateFilters(kind);
+  setVisible(config.chipsId, true);
+  setVisible(config.rangeLabelId, false);
+  setVisible(config.emptyId, !hasSeries);
+  setVisible(config.chartBoxId, hasRows);
+  setVisible(config.footerId, true);
+  setVisible(config.countId, hasRows);
+  setVisible(config.tableVisibleId, hasRows);
+
+  if (!hasSeries) {
+    destroyChart(config.chartKey);
+    document.getElementById(config.countId).textContent = "";
+    const table = config.getTable();
+    if (table) table.setData([]);
+    return;
+  }
+
+  document.getElementById(config.countId).textContent = formatCompareCount(kind, rows.length, config.rowLabel);
+  config.updateCompareChart();
+
+  if (kind === "wp") {
+    const table = config.getTable();
+    if (table) {
+      table.setColumns(WP_COLUMNS);
+      table.setData(rows);
+    } else {
+      config.setTable(new Tabulator(config.tableSelector, {
+        data: rows,
+        layout: "fitColumns",
+        pagination: true,
+        paginationSize: 15,
+        columns: WP_COLUMNS,
+      }));
+    }
+  } else {
+    config.setTable(initMetricSubsetTable(
+      config.getTable(),
+      config.tableSelector,
+      config.getTableColumns,
+      () => getCompareRows(kind)
+    ));
+  }
+}
+
+function renderWeatherDetailPanel(rows) {
+  const date = document.getElementById("weather-date").value;
+  const titleEl = document.getElementById("weather-detail-title");
+  const rowsEl = document.getElementById("weather-detail-rows");
+  const metrics = getVariableWeatherMetricsForCurrentData();
+  if (!rows.length || !date) {
+    titleEl.textContent = "No data";
+    rowsEl.innerHTML = '<p style="font-size:11pt;color:#999;">No data.</p>';
+    return;
+  }
+  titleEl.textContent = formatWeatherDisplay(date);
+  if (rows.length > 1) {
+    rowsEl.innerHTML = rows.map(row => {
+      const site = (row.site_id || "").toUpperCase();
+      const detailRows = metrics.map(m =>
+        `<div class="detail-row"><span>${m.label}</span><span>${formatWeatherDetailValue(row[m.field])}</span></div>`
+      ).join("");
+      return `<div class="weather-detail-site"><strong>${site}</strong>${detailRows}</div>`;
+    }).join("");
+  } else {
+    rowsEl.innerHTML = metrics.map(m =>
+      `<div class="detail-row"><span>${m.label}</span><span>${formatWeatherDetailValue(rows[0][m.field])}</span></div>`
+    ).join("");
+  }
+}
+
+function getWeatherSource() {
+  return document.getElementById("weather-source").value;
+}
+
+function getWeatherMetrics() {
+  return getWeatherSource() === "daymet" ? WEATHER_METRICS_DAYMET : WEATHER_METRICS_ECCC;
+}
+
+function getActiveWeatherPIK() {
+  return getWeatherSource() === "daymet" ? weatherDaymetPIK : weatherEcccPIK;
+}
+
+function getActiveWeatherPIN() {
+  return getWeatherSource() === "daymet" ? weatherDaymetPIN : weatherEcccPIN;
+}
+
+function filterBySite(rows, siteField) {
+  const site = document.getElementById("site-filter").value;
+  return rows.filter(r => {
+    const s = (r[siteField] || "").toUpperCase();
+    if (site !== "all" && s !== site) return false;
+    return true;
+  });
 }
 
 function getFilteredWeather() {
-  return [...filterBySiteYear(weatherPIK, "site_id", "date"), ...filterBySiteYear(weatherPIN, "site_id", "date")];
+  return [...filterBySite(getActiveWeatherPIK(), "site_id"), ...filterBySite(getActiveWeatherPIN(), "site_id")];
 }
 
 function getFilteredFluorescence() {
-  return filterBySiteYear(fluorescence, "site", "date");
+  return filterBySite(fluorescence, "site");
 }
 
 function getFilteredReflectance() {
-  return filterBySiteYear(reflectance, "site", "date");
+  return filterBySite(reflectance, "site");
 }
 
 function getFilteredWP() {
-  return filterBySiteYear(predawnWP, "site", "date");
+  return predawnWP;
 }
 
 function hasWeatherData() { return getFilteredWeather().length > 0; }
-function hasFluorescenceData() { return getFilteredFluorescence().length > 0; }
-function hasReflectanceData() { return getFilteredReflectance().length > 0; }
-function hasWPData() { return getFilteredWP().length > 0; }
-function hasSearchableData() { return hasWeatherData() || hasFluorescenceData() || hasReflectanceData(); }
+function hasFluorescenceData() { return fluorescence.length > 0; }
+function hasReflectanceData() { return reflectance.length > 0; }
+function hasWPData() { return predawnWP.length > 0; }
 
 function setVisible(id, visible) {
   const el = document.getElementById(id);
   if (el) el.classList.toggle("is-hidden", !visible);
 }
 
-function updateVisibility() {
-  const hasWeather = hasWeatherData();
-  const hasFluor = hasFluorescenceData();
-  const hasRefl = hasReflectanceData();
-  const hasWP = hasWPData();
+function findEntity(domainId, entityId) {
+  const domain = ERD_DOMAINS[domainId];
+  if (!domain) return null;
+  return domain.entities.find(e => e.id === entityId) || null;
+}
 
-  setVisible("data-records-block", hasSearchableData());
+function renderHomeDomainCards() {
+  const grid = document.getElementById("domain-home-grid");
+  if (!grid) return;
+  grid.innerHTML = Object.values(ERD_DOMAINS).map(domain => {
+    const available = domain.entities.filter(e => e.available).length;
+    const total = domain.entities.length;
+    const cards = domain.entities.map(entity => `
+      <button type="button" class="entity-card ${entity.available ? "available" : "blank"}"
+        data-domain="${domain.id}" data-entity="${entity.id}">
+        <div class="entity-name">${entity.title}</div>
+        <p class="entity-desc">${entity.desc}</p>
+        <span class="entity-status">${entity.available ? "Available in this build" : "Blank — not loaded yet"}</span>
+      </button>
+    `).join("");
+    return `
+      <div class="domain-card">
+        <div class="domain-card-head">
+          <h3>${domain.title}</h3>
+          <p>${domain.blurb}</p>
+          <p style="margin-top:6px;">${available} of ${total} entities available</p>
+        </div>
+        <div class="domain-card-body">${cards}</div>
+      </div>
+    `;
+  }).join("");
+  grid.querySelectorAll("button[data-domain]").forEach(btn => {
+    btn.addEventListener("click", () => showEntity(btn.dataset.domain, btn.dataset.entity));
+  });
+}
+
+function renderDomainTabs() {
+  const wrap = document.getElementById("domain-tabs");
+  if (!wrap) return;
+  wrap.innerHTML = Object.values(ERD_DOMAINS).map(domain => `
+    <button type="button" role="tab" data-domain="${domain.id}"
+      class="${domain.id === activeDomain ? "active" : ""}">${domain.title}</button>
+  `).join("");
+  wrap.querySelectorAll("button[data-domain]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const domain = ERD_DOMAINS[btn.dataset.domain];
+      const first = domain.entities[0];
+      showEntity(domain.id, first.id);
+    });
+  });
+}
+
+function renderEntityTabs() {
+  const wrap = document.getElementById("entity-tabs");
+  const domain = ERD_DOMAINS[activeDomain];
+  if (!wrap || !domain) return;
+  wrap.innerHTML = domain.entities.map(entity => `
+    <button type="button" role="tab"
+      class="${entity.id === activeEntity ? "active" : ""} ${entity.available ? "" : "blank-tab"}"
+      data-entity="${entity.id}">${entity.title}</button>
+  `).join("");
+  wrap.querySelectorAll("button[data-entity]").forEach(btn => {
+    btn.addEventListener("click", () => showEntity(activeDomain, btn.dataset.entity));
+  });
+}
+
+function showHome() {
+  activeSensor = null;
+  activeDomain = null;
+  activeEntity = null;
+  if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+  setVisible("home-page", true);
+  setVisible("intro-text", true);
+  setVisible("sensor-view", false);
+  renderHomeDomainCards();
+}
+
+function showBlankEntity(domainId, entity) {
+  activeSensor = null;
+  activeDomain = domainId;
+  activeEntity = entity.id;
+  history.replaceState(null, "", `#${domainId}/${entity.id}`);
+  setVisible("home-page", false);
+  setVisible("intro-text", false);
+  setVisible("sensor-view", true);
+  document.getElementById("sensor-view-header").textContent = `${ERD_DOMAINS[domainId].title} · ${entity.title}`;
+  document.getElementById("blank-title").textContent = `${entity.title} — no data loaded yet`;
+  document.getElementById("blank-body").textContent =
+    `${entity.desc} This table is part of the FastPheno schema under ${ERD_DOMAINS[domainId].title}, but no browser CSV is loaded here yet.`;
+  document.getElementById("blank-pk-hint").textContent =
+    entity.pk === "siteID"
+      ? "Expected key: siteID (site-level environmental records)."
+      : "Expected key: primary_key (e.g. PIK_1001) linking to other tree-level tables.";
+  renderDomainTabs();
+  renderEntityTabs();
+  refreshAll();
+}
+
+function showSensor(sensorId) {
+  if (!SENSORS[sensorId]) return;
+  const meta = SENSORS[sensorId];
+  activeSensor = sensorId;
+  activeDomain = meta.domain;
+  activeEntity = meta.entity;
+  history.replaceState(null, "", `#${meta.domain}/${meta.entity}`);
+  setVisible("home-page", false);
+  setVisible("intro-text", false);
+  setVisible("sensor-view", true);
+  document.getElementById("sensor-view-header").textContent =
+    `${ERD_DOMAINS[meta.domain].title} · ${meta.title}`;
+  renderDomainTabs();
+  renderEntityTabs();
+  if (sensorId === "fluorescence") {
+    populateFluorescenceMetricFilter();
+    populateCompareDateFilters("fluor", { reset: true });
+    if (isCampaignRangeMode("fluor")) syncCampaignDateInputs("fluor", true);
+  }
+  if (sensorId === "reflectance") {
+    populateReflectanceMetricFilter();
+    populateCompareDateFilters("refl", { reset: true });
+    if (isCampaignRangeMode("refl")) syncCampaignDateInputs("refl", true);
+  }
+  if (sensorId === "wp") {
+    populateCompareDateFilters("wp", { reset: true });
+    if (isCampaignRangeMode("wp")) syncCampaignDateInputs("wp", true);
+  }
+  refreshAll();
+}
+
+function showEntity(domainId, entityId) {
+  const entity = findEntity(domainId, entityId);
+  if (!entity) return;
+  if (entity.available && entity.sensor) showSensor(entity.sensor);
+  else showBlankEntity(domainId, entity);
+}
+
+function initViewFromHash() {
+  const hash = location.hash.replace(/^#/, "");
+  if (!hash) {
+    showHome();
+    return;
+  }
+  if (SENSORS[hash]) {
+    showSensor(hash);
+    return;
+  }
+  const parts = hash.split("/");
+  if (parts.length === 2 && findEntity(parts[0], parts[1])) {
+    showEntity(parts[0], parts[1]);
+    return;
+  }
+  showHome();
+}
+
+function updateVisibility() {
+  const blank = !activeSensor && !!activeEntity;
+  setVisible("blank-section", blank);
+
+  const hasWeather = activeSensor === "weather" && hasWeatherData();
+  const hasFluor = activeSensor === "fluorescence" && hasFluorescenceData();
+  const hasRefl = activeSensor === "reflectance" && hasReflectanceData();
+  const hasWP = activeSensor === "wp" && (hasWPData() || predawnWP.length > 0);
+
+  setVisible("data-records-block", !blank && activeSensor !== "wp");
+  setVisible("sensor-controls", !blank);
   setVisible("weather-section", hasWeather);
   setVisible("fluorescence-section", hasFluor);
   setVisible("reflectance-section", hasRefl);
-  setVisible("weather-metric-control", hasWeather);
-  setVisible("fluor-metric-control", hasFluor);
-  setVisible("refl-metric-control", hasRefl);
   setVisible("wp-section", hasWP);
+
+  setVisible("weather-controls-view", activeSensor === "weather");
+  setVisible("weather-source-control", activeSensor === "weather");
+  setVisible("weather-metric-control", activeSensor === "weather" && weatherDateMode !== "single");
+  document.getElementById("sensor-controls").classList.toggle("weather-active", activeSensor === "weather");
+  if (activeSensor === "weather") updateWeatherDateModeUI();
+  ["fluor", "refl", "wp"].forEach(kind => {
+    const sensor = CAMPAIGN_ACTIVE_SENSOR[kind];
+    const active = activeSensor === sensor;
+    if (kind === "fluor") setVisible("fluor-metric-control", active);
+    if (kind === "refl") setVisible("refl-metric-control", active);
+    if (compareUsesSite(kind)) setVisible(`${kind}-site-control`, active);
+    setVisible(`${kind}-date-mode-control`, active);
+    if (active) updateCampaignDateModeUI(kind);
+    else {
+      setVisible(`${kind}-filter-group`, false);
+      setVisible(`${kind}-compare-actions`, false);
+      setVisible(`${kind}-range-from`, false);
+      setVisible(`${kind}-range-to`, false);
+    }
+  });
+  setVisible("site-filter-control", activeSensor === "weather");
 }
 
 function getWeatherRows() {
-  return filterSubsetRows([...weatherPIK, ...weatherPIN], "site_id", "date", "weather");
+  return getWeatherBaseRows().filter(r => matchesWeatherDateFilter(r, "date"));
 }
 
 function getFluorescenceRows() {
-  return filterSubsetRows(fluorescence, "site", "date", "fluor");
+  if (isCampaignRangeMode("fluor")) return getCampaignRangeRows("fluor");
+  return getCompareRows("fluor");
 }
 
 function getReflectanceRows() {
-  return filterSubsetRows(reflectance, "site", "date", "refl");
+  if (isCampaignRangeMode("refl")) return getCampaignRangeRows("refl");
+  return getCompareRows("refl");
 }
 
 function getWPRows() {
-  return filterSubsetRows(predawnWP, "site", "date", "wp");
-}
-
-function formatDatasetCount(count, label, prefix) {
-  const { from, to } = getDateFilterBounds(prefix);
-  let rangeLabel = "";
-  if (from && to) rangeLabel = ` (${from} – ${to})`;
-  else if (from) rangeLabel = ` (from ${from})`;
-  else if (to) rangeLabel = ` (through ${to})`;
-  return `${count} ${label}${count === 1 ? "" : "s"}${rangeLabel}`;
+  if (isCampaignRangeMode("wp")) return getCampaignRangeRows("wp");
+  return getCompareRows("wp");
 }
 
 function updateWeatherSection() {
+  syncWeatherDateInputs();
+  const isSingle = weatherDateMode === "single";
   const rows = getWeatherRows();
-  setVisible("weather-chart-box", hasWeatherData() && rows.length > 0);
-  if (!hasWeatherData()) return;
-  document.getElementById("weather-count").textContent = formatDatasetCount(rows.length, "weather row", "weather");
-  updateWeatherChart();
-  weatherTable = initWeatherTable(getWeatherTableColumns(), getWeatherRows);
+  const hasData = hasWeatherData();
+  setVisible("weather-single-view", isSingle && hasData);
+  setVisible("weather-chart-box", !isSingle && hasData && rows.length > 0);
+  setVisible("weather-range-label", !isSingle && hasData);
+  setVisible("weather-table", !isSingle && hasData);
+  setVisible("weather-count", !isSingle && hasData);
+  setVisible("weather-table-footer", !isSingle && hasData);
+  if (!hasData) return;
+  const sourceLabel = getWeatherSource() === "daymet" ? "Daymet" : "ECCC";
+  if (isSingle) {
+    renderWeatherDetailPanel(rows);
+    destroyChart("weather");
+  } else {
+    document.getElementById("weather-count").textContent = formatWeatherDatasetCount(rows.length);
+    const uniqueDates = [...new Set(rows.map(r => r.date))].sort();
+    document.getElementById("weather-range-label").textContent = uniqueDates.length
+      ? `${uniqueDates.length} days · ${uniqueDates[0]} to ${uniqueDates[uniqueDates.length - 1]}`
+      : "No days in range";
+    document.getElementById("weather-chart-title").textContent = `${sourceLabel} — ${getWeatherChartLabel(document.getElementById("weather-metric").value)}`;
+    updateWeatherChart();
+    weatherTable = initWeatherTable(getWeatherTableColumns(), getWeatherRows);
+  }
 }
 
 function updateFluorescenceSection() {
-  const rows = getFluorescenceRows();
-  setVisible("fluorescence-chart-box", hasFluorescenceData() && rows.length > 0);
-  if (!hasFluorescenceData()) return;
-  document.getElementById("fluorescence-count").textContent = formatDatasetCount(rows.length, "fluorescence row", "fluor");
-  updateFluorescenceChart();
-  fluorescenceTable = initMetricSubsetTable(fluorescenceTable, "#fluorescence-table", getFluorescenceTableColumns, getFluorescenceRows);
+  updateCampaignSection("fluor");
 }
 
 function updateReflectanceSection() {
-  const rows = getReflectanceRows();
-  setVisible("reflectance-chart-box", hasReflectanceData() && rows.length > 0);
-  if (!hasReflectanceData()) return;
-  document.getElementById("reflectance-count").textContent = formatDatasetCount(rows.length, "reflectance row", "refl");
-  updateReflectanceChart();
-  reflectanceTable = initMetricSubsetTable(reflectanceTable, "#reflectance-table", getReflectanceTableColumns, getReflectanceRows);
+  updateCampaignSection("refl");
 }
 
 function updateWPSection() {
-  const rows = getWPRows();
-  setVisible("wp-chart-box", hasWPData() && rows.length > 0);
-  const wpCountEl = document.getElementById("wp-count");
-  if (wpCountEl) {
-    if (!hasWPData()) wpCountEl.textContent = "";
-    else wpCountEl.textContent = formatDatasetCount(rows.length, "water potential row", "wp");
-  }
-  if (!hasWPData()) return;
-  updateWPChart();
-  if (wpTable) {
-    wpTable.setData(rows);
-  } else {
-    wpTable = new Tabulator("#summary-table", {
-      data: rows,
-      layout: "fitColumns",
-      pagination: true,
-      paginationSize: 15,
-      columns: WP_COLUMNS,
-    });
-  }
+  updateCampaignSection("wp");
 }
 
 function initWeatherTable(columns, getRows) {
@@ -652,10 +2053,121 @@ function initWeatherTable(columns, getRows) {
   }
   return new Tabulator("#weather-table", {
     data: rows,
-    layout: "fitColumns",
+    layout: "fitData",
     pagination: true,
     paginationSize: 15,
     columns,
+  });
+}
+
+function getWeatherDownloadFilename() {
+  const site = document.getElementById("site-filter").value;
+  const source = getWeatherSource();
+  const from = document.getElementById("weather-from-date")?.value || "";
+  const to = document.getElementById("weather-to-date")?.value || "";
+  const range = from && to ? `_${from}_to_${to}` : "";
+  return `weather_${source}_${site}${range}.csv`;
+}
+
+function downloadWeatherCsv() {
+  if (!weatherTable) return;
+  weatherTable.download("csv", getWeatherDownloadFilename());
+}
+
+function getCampaignDownloadFilename(kind, prefix) {
+  const seriesList = compareSeries[prefix] || [];
+  const metricEl = document.getElementById(`${prefix}-metric`);
+  const metric = metricEl?.value || (prefix === "wp" ? "wp_pd" : "metric");
+  const seriesPart = seriesList.length
+    ? `_${seriesList.map(s => compareUsesSite(prefix) ? `${s.site}-${s.date}` : s.date).join("_")}`
+    : "";
+  return `${kind}_${metric}${seriesPart}.csv`;
+}
+
+function downloadCampaignCsv(kind) {
+  if (isCampaignRangeMode(kind)) {
+    const rows = getCampaignRangeRows(kind);
+    if (!rows.length) return;
+    const fieldOrders = {
+      fluor: fluorescenceFieldOrder,
+      refl: reflectanceFieldOrder,
+      wp: null,
+    };
+    const fields = fieldOrders[kind]?.length
+      ? fieldOrders[kind]
+      : Object.keys(rows[0] || {});
+    downloadRowsAsCsv(rows, fields, getCampaignRangeDownloadFilename(kind));
+    return;
+  }
+  const tables = { fluor: fluorescenceTable, refl: reflectanceTable, wp: wpTable };
+  const names = { fluor: "fluorescence", refl: "reflectance", wp: "predawn_wp" };
+  const table = tables[kind];
+  if (!table) return;
+  table.download("csv", getCampaignDownloadFilename(names[kind], kind));
+}
+
+function downloadFluorescenceCsv() {
+  downloadCampaignCsv("fluor");
+}
+
+function downloadReflectanceCsv() {
+  downloadCampaignCsv("refl");
+}
+
+function downloadWPCsv() {
+  downloadCampaignCsv("wp");
+}
+
+function triggerCsvDownload(csvText, filename) {
+  const blob = new Blob([csvText], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function downloadRowsAsCsv(rows, fields, filename) {
+  if (!rows?.length) return;
+  const csv = fields?.length ? Papa.unparse(rows, { columns: fields }) : Papa.unparse(rows);
+  triggerCsvDownload(csv, filename);
+}
+
+async function downloadSourceCsvFile(filename) {
+  const response = await dataFetch(DATA_BASE + filename);
+  if (!response.ok) throw new Error(`Failed to download ${filename}`);
+  triggerCsvDownload(await response.text(), filename);
+}
+
+function downloadWeatherFullCsv() {
+  const rows = getWeatherBaseRows();
+  if (!rows.length) return;
+  const fields = getWeatherTableColumns().map(col => col.field);
+  const site = document.getElementById("site-filter").value;
+  const source = getWeatherSource();
+  const sitePart = site === "all" ? "all_sites" : site;
+  downloadRowsAsCsv(rows, fields, `weather_${source}_${sitePart}_full.csv`);
+}
+
+function downloadFluorescenceFullCsv() {
+  downloadSourceCsvFile("fluorescence_indices.csv").catch(err => {
+    console.error(err);
+    alert("Could not download full fluorescence dataset.");
+  });
+}
+
+function downloadReflectanceFullCsv() {
+  downloadSourceCsvFile("reflectance_indices.csv").catch(err => {
+    console.error(err);
+    alert("Could not download full reflectance dataset.");
+  });
+}
+
+function downloadWPFullCsv() {
+  downloadSourceCsvFile("predawn_wp_2023.csv").catch(err => {
+    console.error(err);
+    alert("Could not download full predawn water potential dataset.");
   });
 }
 
@@ -669,7 +2181,7 @@ function initMetricSubsetTable(tableVar, selector, getColumns, getRows) {
   }
   return new Tabulator(selector, {
     data: rows,
-    layout: "fitColumns",
+    layout: "fitData",
     pagination: true,
     paginationSize: 15,
     columns,
@@ -690,16 +2202,20 @@ function weatherValue(raw) {
 }
 
 function getWeatherTableColumns() {
-  const metric = document.getElementById("weather-metric").value;
   const base = [
-    { title: "Site", field: "site_id", width: 70 },
-    { title: "Date", field: "date", sorter: "date", minWidth: 110 },
+    { title: "Site", field: "site_id", width: 70, frozen: true },
+    { title: "Date", field: "date", sorter: "string", minWidth: 110, frozen: true },
   ];
-  const found = WEATHER_METRICS.find(m => m.field === metric);
-  if (!found) return base;
+  const metrics = getVariableWeatherMetricsForCurrentData();
   return [
     ...base,
-    { title: found.label, field: found.field, sorter: "number", formatter: numFmt, minWidth: found.minWidth },
+    ...metrics.map(m => ({
+      title: m.label,
+      field: m.field,
+      sorter: "number",
+      formatter: numFmt,
+      minWidth: m.minWidth || 100,
+    })),
   ];
 }
 
@@ -718,84 +2234,42 @@ function getSelectedMetrics(metricValue, metrics) {
   return found ? [found] : [];
 }
 
-function metricTableColumns(metrics) {
-  return metrics.map(m => ({
-    title: m.label,
-    field: m.field,
-    sorter: "number",
-    formatter: metricFmt(m.decimals),
-    minWidth: m.minWidth,
-  }));
+function tableTextFormatter(cell) {
+  const value = cell.getValue();
+  return value == null || value === "" ? "—" : String(value);
+}
+
+function buildDataTableColumns(fields) {
+  if (!fields?.length) return [];
+  return fields.map(field => {
+    const col = {
+      title: field,
+      field,
+      minWidth: Math.max(80, Math.min(150, field.length * 8 + 28)),
+      frozen: TABLE_FROZEN_FIELDS.has(field),
+    };
+    if (field === "date" || field === "datetime_est") col.sorter = "string";
+    if (TABLE_TEXT_FIELDS.has(field)) {
+      col.formatter = tableTextFormatter;
+    } else {
+      col.sorter = "number";
+      col.formatter = metricFmt(field.startsWith("QY") ? 3 : 4);
+    }
+    return col;
+  });
 }
 
 function getFluorescenceTableColumns() {
-  const metric = document.getElementById("fluor-metric").value;
-  const base = [
-    { title: "Site", field: "site", width: 70 },
-    { title: "Year", field: "year", width: 70 },
-    { title: "Date", field: "date", sorter: "date" },
-  ];
-  const selected = getSelectedMetrics(metric, FLUORESCENCE_METRICS);
-  if (!selected.length) return base;
-  return [...base, ...metricTableColumns(selected), { title: "N", field: "n_measurements", sorter: "number", width: 60 }];
+  return buildDataTableColumns(fluorescenceFieldOrder);
 }
 
 function getReflectanceTableColumns() {
-  const metric = document.getElementById("refl-metric").value;
-  const base = [
-    { title: "Site", field: "site", width: 70 },
-    { title: "Year", field: "year", width: 70 },
-    { title: "Date", field: "date", sorter: "date" },
-  ];
-  const selected = getSelectedMetrics(metric, REFLECTANCE_METRICS);
-  if (!selected.length) return base;
-  return [...base, ...metricTableColumns(selected), { title: "N", field: "n_measurements", sorter: "number", width: 60 }];
+  return buildDataTableColumns(reflectanceFieldOrder);
 }
 
 function getWeatherChartLabel(metric) {
-  const found = WEATHER_METRICS.find(m => m.field === metric);
+  const found = getWeatherMetrics().find(m => m.field === metric);
   return found ? found.chartLabel : "Value";
-}
-
-function mean(vals) {
-  const v = vals.filter(x => x != null && !isNaN(x));
-  return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
-}
-
-function updateStats() {
-  const wRows = getWeatherRows();
-  const rRows = getReflectanceRows();
-  const fRows = getFluorescenceRows();
-  const wpRows = getWPRows();
-
-  const cards = [];
-  if (wRows.length) {
-    const temps = wRows.map(r => weatherValue(r.temp)).filter(x => x != null);
-    cards.push({ value: wRows.length, label: "Weather days" });
-    cards.push({ value: mean(temps) != null ? mean(temps).toFixed(1) + "°C" : "—", label: "Mean temp" });
-  }
-  if (rRows.length) {
-    getSelectedMetrics(document.getElementById("refl-metric").value, REFLECTANCE_METRICS).forEach(m => {
-      const vals = rRows.map(r => r[m.field]).filter(x => x != null && !isNaN(x));
-      cards.push({ value: mean(vals) != null ? mean(vals).toFixed(m.decimals) : "—", label: `Mean ${m.label}` });
-    });
-  }
-  if (fRows.length) {
-    getSelectedMetrics(document.getElementById("fluor-metric").value, FLUORESCENCE_METRICS).forEach(m => {
-      const vals = fRows.map(r => r[m.field]).filter(x => x != null && !isNaN(x));
-      cards.push({ value: mean(vals) != null ? mean(vals).toFixed(m.decimals) : "—", label: `Mean ${m.label}` });
-    });
-  }
-  if (wpRows.length) {
-    const wps = wpRows.map(r => parseFloat(r.wp_pd)).filter(x => !isNaN(x));
-    cards.push({ value: mean(wps) != null ? mean(wps).toFixed(3) + " MPa" : "—", label: "Mean predawn Ψ" });
-    cards.push({ value: wpRows.length, label: "WP measurements" });
-  }
-
-  const panel = document.getElementById("stats-panel");
-  panel.innerHTML = cards.length
-    ? cards.map(c => `<div class="stat-card"><div class="value">${c.value}</div><div class="label">${c.label}</div></div>`).join("")
-    : `<div class="stat-card"><div class="value">—</div><div class="label">No data for current filters</div></div>`;
 }
 
 function destroyChart(id) {
@@ -832,122 +2306,388 @@ function updateWeatherChart() {
   });
 }
 
-function buildMetricLineDatasets(rows, metrics) {
-  return metrics.map(m => ({
-    label: m.label,
-    data: rows.map(r => r[m.field]),
-    borderColor: m.color,
-    yAxisID: m.yAxisID || "y",
-    tension: 0.2,
-    pointRadius: 3,
-    borderWidth: 2,
-  }));
+function parseMetricValue(raw) {
+  if (raw == null || raw === "" || raw === "NA") return null;
+  const v = parseFloat(raw);
+  return Number.isNaN(v) ? null : v;
 }
 
-function updateReflectanceChart() {
-  destroyChart("reflectance");
-  if (!hasReflectanceData()) return;
-  const selected = getSelectedMetrics(document.getElementById("refl-metric").value, REFLECTANCE_METRICS);
-  if (!selected.length) return;
-  const rows = getReflectanceRows().sort((a, b) => a.date.localeCompare(b.date));
-  if (!rows.length) return;
-  const multi = selected.length > 1;
-  const scales = {
-    x: { ticks: { maxTicksLimit: 10, font: { size: 9 } } },
-    y: {
-      position: "left",
-      title: { display: true, text: multi ? "NDVI / GNDVI" : selected[0].chartLabel, font: { size: 9 } },
-      ticks: { font: { size: 9 } },
-    },
+function setCampaignChartTitle(datePrefix, sensorTitle, subtitle) {
+  const date = getCampaignDate(datePrefix);
+  const titleId = datePrefix === "fluor" ? "fluorescence-chart-title" : "reflectance-chart-title";
+  const el = document.getElementById(titleId);
+  if (!el) return;
+  const dateLabel = date ? formatWeatherDisplay(date) : "selected date";
+  el.textContent = `${sensorTitle} — ${dateLabel} — ${subtitle}`;
+}
+
+function getCampaignChartType(prefix) {
+  return document.getElementById(`${prefix}-chart-type`)?.value || "scatterbox";
+}
+
+function computeBoxStats(values) {
+  const sorted = values.filter(v => v != null).sort((a, b) => a - b);
+  const n = sorted.length;
+  if (!n) return null;
+  const percentile = (p) => {
+    const idx = (n - 1) * p;
+    const lo = Math.floor(idx);
+    const hi = Math.ceil(idx);
+    if (lo === hi) return sorted[lo];
+    return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
   };
-  if (multi) {
-    scales.y.min = 0;
-    scales.y.max = 1;
-    scales.y1 = {
-      position: "right",
-      title: { display: true, text: "PRI", font: { size: 9 } },
-      grid: { drawOnChartArea: false },
-      ticks: { font: { size: 9 } },
+  return {
+    min: sorted[0],
+    q1: percentile(0.25),
+    median: percentile(0.5),
+    q3: percentile(0.75),
+    max: sorted[n - 1],
+    n,
+  };
+}
+
+function formatBoxValue(value, decimals = 3) {
+  return Number.isFinite(value) ? value.toFixed(decimals) : "—";
+}
+
+function pseudoJitter(groupIndex, pointIndex, spread) {
+  const seed = Math.sin((groupIndex + 1) * 9973 + (pointIndex + 1) * 1319) * 10000;
+  return (seed - Math.floor(seed) - 0.5) * spread;
+}
+
+function buildScatterBoxGroups(rows, metrics) {
+  return metrics.map((metric, groupIndex) => {
+    const stats = computeBoxStats(rows.map(row => parseMetricValue(row[metric.field])));
+    const points = rows.map((row, pointIndex) => ({
+      y: parseMetricValue(row[metric.field]),
+      label: row.primary_key || row.sample || row.Measurement_ID
+        || (row.Genotype != null && row.Genotype !== "" ? `Genotype ${row.Genotype}` : null)
+        || `measurement ${pointIndex + 1}`,
+    })).filter(point => point.y != null);
+    return stats && points.length ? { metric, groupIndex, stats, points } : null;
+  }).filter(Boolean);
+}
+
+function buildCategoryScatterBoxGroups(rows, categoryField, valueField, getColor, decimals = 3) {
+  const categories = [...new Set(rows.map(row => row[categoryField]).filter(v => v != null && v !== ""))].sort();
+  return categories.map((category, groupIndex) => {
+    const subset = rows.filter(row => row[categoryField] === category);
+    const points = subset.map((row, pointIndex) => ({
+      y: parseMetricValue(row[valueField]),
+      label: row.Genotype != null && row.Genotype !== ""
+        ? `Genotype ${row.Genotype}`
+        : `measurement ${pointIndex + 1}`,
+    })).filter(point => point.y != null);
+    const stats = computeBoxStats(points.map(point => point.y));
+    const metric = {
+      field: valueField,
+      label: String(category),
+      color: getColor(category),
+      decimals,
     };
-  } else if (selected[0].yMin != null) {
-    scales.y.min = selected[0].yMin;
-    scales.y.max = selected[0].yMax;
+    return stats && points.length ? { metric, groupIndex, stats, points } : null;
+  }).filter(Boolean);
+}
+
+function drawScatterBoxOverlay(ctx, xScale, yScale, group, boxHalfWidth) {
+  const { stats, metric } = group;
+  const x = xScale.getPixelForValue(group.groupIndex);
+  const color = metric.color || "#336633";
+  const xLeft = x - boxHalfWidth;
+  const yQ1 = yScale.getPixelForValue(stats.q1);
+  const yQ3 = yScale.getPixelForValue(stats.q3);
+  const boxHeight = yQ1 - yQ3;
+
+  ctx.save();
+  ctx.fillStyle = hexToRgba(color, 0.22);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.fillRect(xLeft, yQ3, boxHalfWidth * 2, boxHeight);
+  ctx.strokeRect(xLeft, yQ3, boxHalfWidth * 2, boxHeight);
+
+  const cap = Math.min(boxHalfWidth, 24);
+  drawBoxWhisker(ctx, x, yScale.getPixelForValue(stats.min), yQ1, cap);
+  drawBoxWhisker(ctx, x, yQ3, yScale.getPixelForValue(stats.max), cap);
+
+  ctx.lineWidth = 2.5;
+  const yMed = yScale.getPixelForValue(stats.median);
+  ctx.beginPath();
+  ctx.moveTo(xLeft, yMed);
+  ctx.lineTo(xLeft + boxHalfWidth * 2, yMed);
+  ctx.stroke();
+  ctx.restore();
+}
+
+const scatterBoxOverlayPlugin = {
+  id: "scatterBoxOverlay",
+  beforeDatasetsDraw(chart) {
+    const groups = chart.$scatterBoxGroups;
+    if (!groups?.length) return;
+    const { ctx, scales: { x: xScale, y: yScale } } = chart;
+    const boxHalfWidth = Math.min(
+      Math.abs(xScale.getPixelForValue(0.4) - xScale.getPixelForValue(0)),
+      28
+    );
+    groups.forEach(group => drawScatterBoxOverlay(ctx, xScale, yScale, group, boxHalfWidth));
+  },
+};
+
+function drawBoxWhisker(ctx, x, yStart, yEnd, cap) {
+  ctx.beginPath();
+  ctx.moveTo(x, yStart);
+  ctx.lineTo(x, yEnd);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x - cap / 2, yStart);
+  ctx.lineTo(x + cap / 2, yStart);
+  ctx.stroke();
+}
+
+function getNiceValueScaleBounds(values, paddingFraction = 0.1) {
+  const finite = values.filter(v => Number.isFinite(v));
+  if (!finite.length) return {};
+  const min = Math.min(...finite);
+  const max = Math.max(...finite);
+  const span = max - min || Math.max(Math.abs(max), 1) * 0.1;
+  const pad = span * paddingFraction;
+  return { min: min - pad, max: max + pad };
+}
+
+function buildCampaignScatterBoxChart(ctx, rows, metrics, axisLabels = {}) {
+  return buildScatterBoxChartFromGroups(ctx, buildScatterBoxGroups(rows, metrics), axisLabels);
+}
+
+function buildScatterBoxChartFromGroups(ctx, groups, axisLabels = {}) {
+  if (!groups.length) return null;
+
+  const scatterPoints = [];
+  groups.forEach(group => {
+    const spread = Math.min(0.72, 0.22 + group.points.length * 0.004);
+    group.points.forEach((point, pointIndex) => {
+      scatterPoints.push({
+        x: group.groupIndex + pseudoJitter(group.groupIndex, pointIndex, spread),
+        y: point.y,
+        label: point.label,
+        metricLabel: group.metric.label,
+        decimals: group.metric.decimals ?? 3,
+        color: group.metric.color,
+      });
+    });
+  });
+
+  const yBounds = getNiceValueScaleBounds(scatterPoints.map(point => point.y), 0.1);
+  const chart = new Chart(ctx, {
+    type: "scatter",
+    data: {
+      datasets: [{
+        label: "Measurements",
+        data: scatterPoints,
+        backgroundColor: scatterPoints.map(point => hexToRgba(point.color || "#336633", 0.55)),
+        borderColor: scatterPoints.map(point => point.color || "#336633"),
+        borderWidth: 1,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          type: "linear",
+          min: -0.55,
+          max: groups.length - 0.45,
+          title: {
+            display: axisLabels.xTitle !== false,
+            text: typeof axisLabels.xTitle === "string" ? axisLabels.xTitle : "Metric",
+            font: { size: 9 },
+          },
+          ticks: {
+            stepSize: 1,
+            font: { size: 9 },
+            callback(value) {
+              if (!Number.isInteger(value)) return "";
+              const group = this.chart.$scatterBoxGroups?.find(entry => entry.groupIndex === value);
+              return group ? group.metric.label : "";
+            },
+          },
+          grid: { drawOnChartArea: false },
+        },
+        y: {
+          beginAtZero: false,
+          min: yBounds.min,
+          max: yBounds.max,
+          title: { display: true, text: axisLabels.yTitle || "Value", font: { size: 9 } },
+          ticks: { font: { size: 9 } },
+        },
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label(context) {
+              const point = context.raw;
+              return `${point.label}: ${point.metricLabel} ${formatBoxValue(point.y, point.decimals)}`;
+            },
+          },
+        },
+      },
+    },
+    plugins: [scatterBoxOverlayPlugin],
+  });
+  chart.$scatterBoxGroups = groups;
+  return chart;
+}
+
+function hexToRgba(hex, alpha = 0.55) {
+  const normalized = hex.replace("#", "");
+  const full = normalized.length === 3
+    ? normalized.split("").map(c => c + c).join("")
+    : normalized;
+  const int = parseInt(full, 16);
+  const r = (int >> 16) & 255;
+  const g = (int >> 8) & 255;
+  const b = int & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function buildHistogram(values, binCount = 18) {
+  if (!values.length) return { labels: [], counts: [] };
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const labels = [];
+  const counts = Array(binCount).fill(0);
+  for (let i = 0; i < binCount; i++) {
+    const lo = min + (range * i) / binCount;
+    const hi = min + (range * (i + 1)) / binCount;
+    const decimals = range < 1 ? 3 : 2;
+    labels.push(`${lo.toFixed(decimals)}–${hi.toFixed(decimals)}`);
+  }
+  values.forEach(value => {
+    let idx = Math.floor(((value - min) / range) * binCount);
+    if (idx >= binCount) idx = binCount - 1;
+    if (idx < 0) idx = 0;
+    counts[idx]++;
+  });
+  return { labels, counts };
+}
+
+function buildCampaignHistogramChart(ctx, rows, metric) {
+  const values = rows.map(r => parseMetricValue(r[metric.field])).filter(v => v != null);
+  const { labels, counts } = buildHistogram(values);
+  return new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [{
+        label: "Measurements",
+        data: counts,
+        backgroundColor: hexToRgba(metric.color, 0.65),
+        borderColor: metric.color,
+        borderWidth: 1,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          title: { display: true, text: metric.chartLabel, font: { size: 9 } },
+          ticks: { maxRotation: 45, minRotation: 45, font: { size: 8 } },
+        },
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: "Count", font: { size: 9 } },
+          ticks: { precision: 0, font: { size: 9 } },
+        },
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: context => `${context.parsed.y} measurement${context.parsed.y === 1 ? "" : "s"}`,
+          },
+        },
+      },
+    },
+  });
+}
+
+function renderCampaignChart(ctx, rows, metrics, chartType, datePrefix, sensorTitle) {
+  if (chartType === "histogram") {
+    const metric = metrics[0];
+    setCampaignChartTitle(datePrefix, sensorTitle, `${metric.chartLabel} distribution`);
+    return buildCampaignHistogramChart(ctx, rows, metric);
+  }
+
+  const subtitle = metrics.length === 1
+    ? `${metrics[0].chartLabel} scatter-box`
+    : "scatter-box summary";
+  setCampaignChartTitle(datePrefix, sensorTitle, subtitle);
+  return buildCampaignScatterBoxChart(ctx, rows, metrics);
+}
+
+function updateReflectanceCompareChart() {
+  destroyChart("reflectance");
+  if (!hasReflectanceData() || !compareSeries.refl.length) return;
+  const metrics = getVariableReflectanceChartMetrics();
+  const field = document.getElementById("refl-metric").value;
+  const metric = metrics.find(m => m.field === field) || metrics[0];
+  if (!metric) return;
+  const groups = buildCompareChartGroups("refl", metric);
+  if (!groups.length) return;
+  const titleEl = document.getElementById("reflectance-chart-title");
+  if (titleEl) {
+    titleEl.textContent = groups.length === 1
+      ? `${metric.chartLabel || metric.label} — ${compareSeriesFullLabel("refl", compareSeries.refl[0])}`
+      : `${metric.chartLabel || metric.label} — ${groups.length} series (sites / dates)`;
   }
   const ctx = document.getElementById("reflectance-chart");
-  charts.reflectance = new Chart(ctx, {
-    type: "line",
-    data: { labels: rows.map(r => r.date), datasets: buildMetricLineDatasets(rows, selected) },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      scales,
-      plugins: { legend: { labels: { font: { size: 9 } } } }
-    }
+  charts.reflectance = buildScatterBoxChartFromGroups(ctx, groups, {
+    xTitle: "Site · date",
+    yTitle: metric.chartLabel || metric.label,
   });
 }
 
-function updateFluorescenceChart() {
+function updateFluorescenceCompareChart() {
   destroyChart("fluorescence");
-  if (!hasFluorescenceData()) return;
-  const selected = getSelectedMetrics(document.getElementById("fluor-metric").value, FLUORESCENCE_METRICS);
-  if (!selected.length) return;
-  const rows = getFluorescenceRows().sort((a, b) => a.date.localeCompare(b.date));
-  if (!rows.length) return;
-  const multi = selected.length > 1;
-  const scales = {
-    x: { ticks: { maxTicksLimit: 10, font: { size: 9 } } },
-    y: {
-      position: "left",
-      title: { display: true, text: multi ? "QY_max" : selected[0].chartLabel, font: { size: 9 } },
-      ticks: { font: { size: 9 } },
-    },
-  };
-  if (multi) {
-    scales.y1 = {
-      position: "right",
-      title: { display: true, text: "NPQ_Lss", font: { size: 9 } },
-      grid: { drawOnChartArea: false },
-      ticks: { font: { size: 9 } },
-    };
+  if (!hasFluorescenceData() || !compareSeries.fluor.length) return;
+  const metrics = getVariableFluorescenceChartMetrics();
+  const field = document.getElementById("fluor-metric").value;
+  const metric = metrics.find(m => m.field === field) || metrics[0];
+  if (!metric) return;
+  const groups = buildCompareChartGroups("fluor", metric);
+  if (!groups.length) return;
+  const titleEl = document.getElementById("fluorescence-chart-title");
+  if (titleEl) {
+    titleEl.textContent = groups.length === 1
+      ? `${metric.chartLabel || metric.label} — ${compareSeriesFullLabel("fluor", compareSeries.fluor[0])}`
+      : `${metric.chartLabel || metric.label} — ${groups.length} series (sites / dates)`;
   }
   const ctx = document.getElementById("fluorescence-chart");
-  charts.fluorescence = new Chart(ctx, {
-    type: "line",
-    data: { labels: rows.map(r => r.date), datasets: buildMetricLineDatasets(rows, selected) },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      scales,
-      plugins: { legend: { labels: { font: { size: 9 } } } }
-    }
+  charts.fluorescence = buildScatterBoxChartFromGroups(ctx, groups, {
+    xTitle: "Site · date",
+    yTitle: metric.chartLabel || metric.label,
   });
 }
 
-const CLUSTER_COLORS = { A: "#336633", B: "#cc6600", C: "#4169E1", D: "#993366", E: "#669933", F: "#cc3333", G: "#996633", H: "#333399" };
-
-function updateWPChart() {
+function updateWPCompareChart() {
   destroyChart("wp");
-  if (!hasWPData()) return;
-  const rows = getWPRows();
-  const clusters = [...new Set(rows.map(r => r.Cluster))].sort();
-  const datasets = clusters.map(c => ({
-    label: "Cluster " + c,
-    data: rows.filter(r => r.Cluster === c).map(r => ({ x: r.date, y: parseFloat(r.wp_pd) })),
-    backgroundColor: CLUSTER_COLORS[c] || "#999",
-    borderColor: CLUSTER_COLORS[c] || "#999",
-    pointRadius: 4,
-    pointHoverRadius: 6,
-  }));
+  if (!hasWPData() || !compareSeries.wp.length) return;
+  const metric = { field: "wp_pd", label: "Predawn Ψ", chartLabel: "Predawn Ψ (MPa)", decimals: 3 };
+  const groups = buildCompareChartGroups("wp", metric);
+  if (!groups.length) return;
+  const titleEl = document.getElementById("wp-chart-title");
+  if (titleEl) {
+    titleEl.textContent = groups.length === 1
+      ? `Predawn Ψ — ${compareSeriesFullLabel("wp", compareSeries.wp[0])}`
+      : `Predawn Ψ — ${groups.length} dates`;
+  }
   const ctx = document.getElementById("wp-chart");
-  charts.wp = new Chart(ctx, {
-    type: "scatter",
-    data: { datasets },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      scales: {
-        x: { type: "category", title: { display: true, text: "Date", font: { size: 9 } }, ticks: { maxTicksLimit: 8, font: { size: 9 } } },
-        y: { title: { display: true, text: "Predawn Ψ (MPa)", font: { size: 9 } }, ticks: { font: { size: 9 } } }
-      },
-      plugins: { legend: { labels: { font: { size: 9 } } } }
-    }
+  charts.wp = buildScatterBoxChartFromGroups(ctx, groups, {
+    xTitle: "Date",
+    yTitle: "Predawn Ψ (MPa)",
   });
 }
 
@@ -957,19 +2697,6 @@ function refreshAll() {
   updateFluorescenceSection();
   updateReflectanceSection();
   updateWPSection();
-  updateStats();
-}
-
-function populateYearFilter() {
-  const years = [...new Set([
-    ...weatherPIK, ...weatherPIN,
-    ...fluorescence, ...reflectance, ...predawnWP,
-  ].map(r => yearFromDate(r.date || r.year)).filter(Boolean))].sort();
-  const sel = document.getElementById("year-filter");
-  const current = sel.value;
-  sel.innerHTML = '<option value="all">All years</option>' + years.map(y => `<option value="${y}">${y}</option>`).join("");
-  if (current !== "all" && [...sel.options].some(o => o.value === current)) sel.value = current;
-  else if (years.includes("2023")) sel.value = "2023";
 }
 
 function populateMetricFilter(selectId, metrics, defaultField, allowAll = false) {
@@ -983,29 +2710,66 @@ function populateMetricFilter(selectId, metrics, defaultField, allowAll = false)
 }
 
 function populateWeatherMetricFilter() {
-  populateMetricFilter("weather-metric", WEATHER_METRICS, "temp");
+  const variable = getVariableWeatherMetricsForCurrentData();
+  const defaultField = variable.some(m => m.field === "temp") ? "temp" : (variable[0]?.field || "temp");
+  populateMetricFilter("weather-metric", variable, defaultField);
+}
+
+function loadWeatherMetadata() {
+  const path = getWeatherSource() === "daymet" ? "weather_daymet.md" : "weather.md";
+  const panel = document.getElementById("weather-metadata");
+  panel.classList.add("loading");
+  return loadMarkdown(DATA_BASE + path)
+    .then(md => {
+      let content = md;
+      if (path === "weather.md") content = stripVpdFromMarkdown(md);
+      panel.innerHTML = renderMarkdown(content);
+      panel.classList.remove("loading");
+    })
+    .catch(err => {
+      panel.textContent = "Metadata unavailable: " + err.message;
+      panel.classList.remove("loading");
+    });
+}
+
+function onWeatherSourceChange() {
+  populateWeatherMetricFilter();
+  loadWeatherMetadata();
+  syncWeatherDateInputs(true);
+  refreshAll();
 }
 
 function populateFluorescenceMetricFilter() {
-  populateMetricFilter("fluor-metric", FLUORESCENCE_METRICS, "QY_max", true);
+  const variable = getVariableFluorescenceChartMetrics();
+  const preferred = ["QY_max", "NPQ_Lss", "Fo", "Fm"];
+  const defaultField = preferred.find(field => variable.some(m => m.field === field))
+    || variable[0]?.field
+    || "";
+  populateMetricFilter("fluor-metric", variable, defaultField);
 }
 
 function populateReflectanceMetricFilter() {
-  populateMetricFilter("refl-metric", REFLECTANCE_METRICS, "NDVI", true);
+  const variable = getVariableReflectanceChartMetrics();
+  const preferred = ["NDVI", "PRI", "GNDVI", "EVI", "NDRE"];
+  const defaultField = preferred.find(field => variable.some(m => m.field === field))
+    || variable[0]?.field
+    || "";
+  populateMetricFilter("refl-metric", variable, defaultField);
+  syncCompareMetricLock("refl");
 }
 
 function loadMetadataPanels() {
   const panels = [
-    { id: "weather-metadata", path: "weather.md" },
     { id: "fluorescence-metadata", path: "fluorescence_pin_2023.md" },
     { id: "reflectance-metadata", path: "reflectance_pin_2023.md" },
+    { id: "wp-metadata", path: "predawn_wp_pin_2023.md" },
   ];
+  loadWeatherMetadata();
   return Promise.all(panels.map(p =>
     loadMarkdown(DATA_BASE + p.path)
       .then(md => {
         let content = md;
-        if (p.path === "weather.md") content = stripVpdFromMarkdown(md);
-        else if (p.path === "reflectance_pin_2023.md") content = stripReflectanceBoilerplate(md);
+        if (p.path === "reflectance_pin_2023.md") content = stripReflectanceBoilerplate(md);
         document.getElementById(p.id).innerHTML = renderMarkdown(content);
         document.getElementById(p.id).classList.remove("loading");
       })
@@ -1013,61 +2777,146 @@ function loadMetadataPanels() {
   ));
 }
 
-Promise.all([
-  loadCSV(DATA_BASE + "PIK_daily_2010-2024.csv"),
-  loadCSV(DATA_BASE + "PIN_daily_2010-2024.csv"),
-  loadCSV(DATA_BASE + "reflectance_indices.csv"),
-  loadCSV(DATA_BASE + "fluorescence_indices.csv"),
-  loadCSV(DATA_BASE + "predawn_wp_2023.csv"),
-]).then(([pik, pin, refl, fluor, wp]) => {
-  weatherPIK = pik;
-  weatherPIN = pin;
-  reflectance = refl;
-  fluorescence = fluor;
+ensureAuth().then(me => {
+  if (me?.email) {
+    const bar = document.getElementById("auth-user-bar");
+    if (bar) {
+      bar.style.display = "flex";
+      document.getElementById("auth-user-email").textContent = `Signed in as ${me.email}`;
+    }
+  }
+  return Promise.all([
+    loadCSV(DATA_BASE + "PIK_daily_2010-2024.csv"),
+    loadCSV(DATA_BASE + "PIN_daily_2010-2024.csv"),
+    loadCSV(DATA_BASE + "PIK_daymet_daily_2010-2024.csv"),
+    loadCSV(DATA_BASE + "PIN_daymet_daily_2010-2024.csv"),
+    loadCSV(DATA_BASE + "reflectance_indices.csv", true),
+    loadCSV(DATA_BASE + "fluorescence_indices.csv", true),
+    loadCSV(DATA_BASE + "predawn_wp_2023.csv"),
+  ]);
+}).then(([pik, pin, daymetPik, daymetPin, reflPack, fluorPack, wp]) => {
+  weatherEcccPIK = pik;
+  weatherEcccPIN = pin;
+  weatherDaymetPIK = daymetPik;
+  weatherDaymetPIN = daymetPin;
+  reflectance = reflPack.data;
+  reflectanceFieldOrder = reflPack.fields;
+  fluorescence = fluorPack.data;
+  fluorescenceFieldOrder = fluorPack.fields;
   predawnWP = wp;
-  populateMonthDaySelects();
-  populateYearFilter();
   populateWeatherMetricFilter();
   populateFluorescenceMetricFilter();
   populateReflectanceMetricFilter();
+  COMPARE_KINDS.forEach(kind => populateCompareDateFilters(kind, { reset: true }));
+  syncWeatherDateInputs(true);
   loadMetadataPanels();
-  refreshAll();
+  initViewFromHash();
+  if (activeSensor) refreshAll();
 }).catch(err => {
-  document.getElementById("stats-panel").innerHTML =
-    `<div class="stat-card"><div class="value" style="color:#c00;font-size:10pt;">Error</div><div class="label">${err.message}. Serve via: python3 -m http.server</div></div>`;
+  console.error(err);
 });
 
-const SECTION_UPDATERS = {
-  weather: updateWeatherSection,
-  fluor: updateFluorescenceSection,
-  refl: updateReflectanceSection,
-  wp: updateWPSection,
-};
-
-function onDateFilterChange(prefix) {
-  SECTION_UPDATERS[prefix]();
-  updateStats();
-}
-
-["site-filter", "year-filter"].forEach(id => {
-  document.getElementById(id).addEventListener("change", refreshAll);
+document.getElementById("site-filter").addEventListener("change", () => {
+  if (activeSensor === "weather") {
+    syncWeatherDateInputs(true);
+    populateWeatherMetricFilter();
+  }
+  refreshAll();
 });
-document.getElementById("weather-metric").addEventListener("change", () => {
-  updateWeatherSection();
-  updateStats();
-});
-document.getElementById("fluor-metric").addEventListener("change", () => {
-  updateFluorescenceSection();
-  updateStats();
-});
-document.getElementById("refl-metric").addEventListener("change", () => {
-  updateReflectanceSection();
-  updateStats();
-});
-DATE_FILTER_PREFIXES.forEach(prefix => {
-  ["from-month", "from-day", "to-month", "to-day"].forEach(part => {
-    document.getElementById(`${prefix}-${part}`).addEventListener("change", () => onDateFilterChange(prefix));
+document.getElementById("weather-source").addEventListener("change", onWeatherSourceChange);
+document.getElementById("weather-metric").addEventListener("change", updateWeatherSection);
+document.getElementById("weather-download-csv").addEventListener("click", downloadWeatherCsv);
+document.getElementById("weather-download-full-csv").addEventListener("click", downloadWeatherFullCsv);
+document.getElementById("fluorescence-download-csv").addEventListener("click", downloadFluorescenceCsv);
+document.getElementById("fluorescence-download-full-csv").addEventListener("click", downloadFluorescenceFullCsv);
+["fluor", "refl", "wp"].forEach(kind => {
+  const sectionRefresh = () => {
+    if (kind === "fluor") updateFluorescenceSection();
+    else if (kind === "refl") updateReflectanceSection();
+    else updateWPSection();
+  };
+  document.getElementById(`${kind}-mode-toggle`)?.addEventListener("click", e => {
+    const btn = e.target.closest("button[data-mode]");
+    if (!btn) return;
+    campaignDateMode[kind] = btn.dataset.mode;
+    document.querySelectorAll(`#${kind}-mode-toggle button`).forEach(b => b.classList.toggle("active", b === btn));
+    updateCampaignDateModeUI(kind);
+    if (isCampaignRangeMode(kind)) syncCampaignDateInputs(kind, true);
+    sectionRefresh();
   });
+  document.getElementById(`${kind}-from-date`)?.addEventListener("change", () => {
+    enforceCampaignDateRange(kind, "from");
+    sectionRefresh();
+  });
+  document.getElementById(`${kind}-to-date`)?.addEventListener("change", () => {
+    enforceCampaignDateRange(kind, "to");
+    sectionRefresh();
+  });
+});
+document.getElementById("reflectance-download-csv").addEventListener("click", downloadReflectanceCsv);
+document.getElementById("reflectance-download-full-csv").addEventListener("click", downloadReflectanceFullCsv);
+document.getElementById("weather-mode-toggle").addEventListener("click", e => {
+  const btn = e.target.closest("button[data-mode]");
+  if (!btn) return;
+  weatherDateMode = btn.dataset.mode;
+  document.querySelectorAll("#weather-mode-toggle button").forEach(b => b.classList.toggle("active", b === btn));
+  updateWeatherDateModeUI();
+  updateWeatherSection();
+});
+document.getElementById("weather-date").addEventListener("change", updateWeatherSection);
+document.getElementById("weather-from-date").addEventListener("change", () => {
+  enforceWeatherDateRange("from");
+  updateWeatherSection();
+});
+document.getElementById("weather-to-date").addEventListener("change", () => {
+  enforceWeatherDateRange("to");
+  updateWeatherSection();
+});
+COMPARE_KINDS.forEach(kind => {
+  const sectionRefresh = () => {
+    if (kind === "fluor") updateFluorescenceSection();
+    else if (kind === "refl") updateReflectanceSection();
+    else updateWPSection();
+  };
+  const metricEl = document.getElementById(`${kind}-metric`);
+  if (metricEl) {
+    metricEl.addEventListener("change", () => {
+      if (isCampaignRangeMode(kind)) {
+        sectionRefresh();
+        return;
+      }
+      if (compareSeries[kind].length === 0) refreshCompareSection(kind);
+    });
+  }
+  const siteEl = document.getElementById(`${kind}-site`);
+  if (siteEl) {
+    siteEl.addEventListener("change", () => {
+      if (isCampaignRangeMode(kind)) {
+        syncCampaignDateInputs(kind, true);
+        sectionRefresh();
+        return;
+      }
+      populateCompareDateFilters(kind, { reset: true });
+    });
+  }
+  document.getElementById(`${kind}-add-series`)?.addEventListener("click", () => addCompareSeries(kind));
+  document.getElementById(`${kind}-clear-series`)?.addEventListener("click", () => clearCompareSeries(kind));
+  document.getElementById(`${kind}-year`)?.addEventListener("change", () => {
+    populateCompareDateFilters(kind, { cascadeFrom: "year" });
+  });
+  document.getElementById(`${kind}-month`)?.addEventListener("change", () => {
+    populateCompareDateFilters(kind, { cascadeFrom: "month" });
+  });
+});
+document.getElementById("wp-download-csv").addEventListener("click", downloadWPCsv);
+document.getElementById("wp-download-full-csv").addEventListener("click", downloadWPFullCsv);
+
+document.getElementById("back-to-home").addEventListener("click", e => {
+  e.preventDefault();
+  showHome();
+});
+window.addEventListener("hashchange", () => {
+  initViewFromHash();
 });
 </script>
 </body>

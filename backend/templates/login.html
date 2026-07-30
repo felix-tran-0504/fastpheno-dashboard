@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FastPheno — Sign in</title>
+  <link rel="stylesheet" type="text/css" href="/efp.css">
+  <style>
+    body { max-width: 520px; margin: 40px auto; padding: 0 16px 32px; font-size: 10pt; }
+    h1 { font-size: 14pt; color: #336633; margin: 0 0 8px; }
+    p { color: #666; line-height: 1.5; }
+    label { display: block; font-weight: bold; margin: 16px 0 6px; }
+    input[type="email"], input[type="text"] {
+      width: 100%; box-sizing: border-box; padding: 10px; font-size: 10pt;
+      border: 1px solid #ccc;
+    }
+    input.pin-input {
+      font-size: 18pt; letter-spacing: 0.35em; text-align: center; font-family: monospace;
+    }
+    button {
+      display: inline-block; margin-top: 14px; padding: 10px 16px; font-size: 10pt; cursor: pointer;
+      background: #336633; color: #fff; border: 1px solid #336633; font-family: inherit;
+    }
+    button:hover { background: #274d27; }
+    button.secondary {
+      background: #fff; color: #336633; margin-left: 8px;
+    }
+    button.secondary:hover { background: #f4faf4; }
+    .msg { margin-top: 16px; padding: 12px 14px; border: 1px solid #ccc; background: #f8faf8; }
+    .msg.error { border-color: #c99; background: #fff5f5; color: #800; }
+    .msg.success { border-color: #9c9; background: #f4faf4; }
+    .dev-pin-box {
+      margin-top: 12px; padding: 14px; background: #fff; border: 1px dashed #999;
+      text-align: center; font-size: 22pt; letter-spacing: 0.25em; font-family: monospace; color: #336633;
+    }
+    .hint { font-size: 8.5pt; color: #888; margin-top: 20px; }
+    .warn { font-size: 9pt; color: #666; background: #fff8e6; border: 1px solid #e6d9a8; padding: 8px 10px; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <h1>FastPheno sign in</h1>
+
+  {% if step == "pin" %}
+  <p>Enter the 6-digit code sent to <strong>{{ email }}</strong>.</p>
+  {% elif dev_mode %}
+  <p class="warn"><strong>Dev mode:</strong> no real email is sent. After you submit your email, the code appears on this page.</p>
+  {% else %}
+  <p>Enter your email and we’ll send a one-time 6-digit code. No password needed.</p>
+  {% endif %}
+
+  {% if error %}
+  <div class="msg error">{{ error }}</div>
+  {% endif %}
+
+  {% if smtp_fallback_warning %}
+  <div class="msg error" style="margin-top:12px;">{{ smtp_fallback_warning }}</div>
+  {% endif %}
+
+  {% if step == "pin" %}
+  <div class="msg success">
+    {% if dev_pin %}
+    <p style="margin:0 0 8px;"><strong>{% if smtp_fallback_warning %}Sign-in code for {{ email }}{% else %}Dev code for {{ email }}{% endif %}</strong></p>
+    <div class="dev-pin-box">{{ dev_pin }}</div>
+    <p class="hint" style="margin-top:10px;">Expires in {{ pin_minutes }} minutes. Use <code>http://localhost:8000</code> (not port 8090).</p>
+    {% else %}
+    <p style="margin:0;">Check your inbox for the 6-digit code.</p>
+    {% endif %}
+  </div>
+  <form method="post" action="/login/verify">
+    <input type="hidden" name="email" value="{{ email }}">
+    <input type="hidden" name="next" value="{{ next }}">
+    <label for="pin">6-digit code</label>
+    <input type="text" id="pin" name="pin" class="pin-input" required
+           inputmode="numeric" pattern="[0-9]{6}" maxlength="6" minlength="6"
+           autocomplete="one-time-code" placeholder="000000" autofocus>
+    <div>
+      <button type="submit">Sign in</button>
+      <button type="button" class="secondary" onclick="location.href='/login?next={{ next | urlencode }}'">Use a different email</button>
+    </div>
+  </form>
+  {% else %}
+  <form method="post" action="/login">
+    <input type="hidden" name="next" value="{{ next }}">
+    <label for="email">Email</label>
+    <input type="email" id="email" name="email" required autocomplete="email" placeholder="you@example.com" value="{{ email }}">
+    <button type="submit">Send sign-in code</button>
+  </form>
+  {% endif %}
+
+  <p class="hint">Open this page at <strong>http://localhost:8000/login</strong> (auth server). Port 8090 is the old static site without login.</p>
+</body>
+</html>

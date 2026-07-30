@@ -31,15 +31,3 @@
 | EVI2 | Two-band Enhanced Vegetation Index; Formular: 2.5 * (`858` - `645`) / (`858` + 2.4 * `645` + 1.0) |
 | SAVI | Soil Adjusted Vegetation Index; Formular: ((`860` - `660`) / (`860` + `660` + 0.5)) * (1 + 0.5) |
 | GNDVI | Green Normalized Difference Vegetation Index; Formular: (`800` - `550`) / (`800` + `550`) |
-
-## Derived Dashboard CSV (`reflectance_pin_2023_indices.csv`)
-
-| Column Name | Description |
-|---|---|
-| site | Field site identifier (PIN). |
-| year | Measurement year. |
-| date | Date of spectral acquisition (YYYY-MM-DD). |
-| NDVI | Daily mean Normalized Difference Vegetation Index. |
-| PRI | Daily mean Photochemical Reflectance Index. |
-| GNDVI | Daily mean Green NDVI. |
-| n_measurements | Number of tree-level spectra aggregated per day. |
