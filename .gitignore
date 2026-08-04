@@ -4,3 +4,6 @@
 .cursor/*.png
 backend/auth.db
 backend/.env
+__pycache__/
+*.pyc
+data/fastpheno/parquet/

@@ -1,41 +1,111 @@
 # FastPheno Plant Physiology Dashboard
 
-A lightweight, browser-based dashboard for exploring FastPheno field data from the `III_db_final` research collection. It covers weather, reflectance vegetation indices, chlorophyll fluorescence, and predawn water potential across Pickering (PIK) and Pintendre (PIN).
+A lightweight, browser-based dashboard for exploring FastPheno field data from the `III_db_final` research collection. It covers weather, reflectance vegetation indices, chlorophyll fluorescence, predawn water potential, and UAV hyperspectral indices across Pickering (PIK) and Pintendre (PIN).
 
-The app is a single static HTML page. No backend is required beyond a local HTTP server.
+The app is a single HTML dashboard backed by a **FastAPI query API**. Sensor data is **lazy-loaded** on demand (no bulk CSV parsing in the browser). CSV exports remain the source of truth; the API queries **Parquet** files built from those CSVs.
 
 ## Features
 
 - **Weather** — ECCC and Daymet daily records (2010–2024); single-day detail or date-range charts
-- **Fluorescence** — campaign-level metrics (e.g. QY<sub>max</sub>, NPQ); site/date compare with scatter-box charts
-- **Reflectance** — vegetation indices (e.g. NDVI, PRI, GNDVI); same site/date compare UX
+- **Fluorescence** — campaign metrics (e.g. QY<sub>max</sub>, NPQ); **Compare dates** or **Date range**; scatter-box charts by tree
+- **Reflectance** — vegetation indices (e.g. NDVI, PRI, GNDVI); same compare/range UX with site-aware date filters
 - **Predawn water potential** — date-only comparison of Ψ<sub>pd</sub> by cluster and genotype
+- **UAV hyperspectral (Hyp_spec)** — tree-level index metrics (2022–2023); compare dates across flights or date-range table view; site-specific flight-date pickers
 - **Metadata panels** — field descriptions loaded from markdown next to each sensor view
-- **Tables + CSV download** — Tabulator tables for selected series or weather ranges
+- **Tables + CSV download** — Tabulator tables (full-width layout) for selected series or filtered ranges
 
 ## Quick start
 
+### Backend mode (required for sensor views)
+
 ```bash
 cd "/path/to/PCA_C-SPIRIT Single Cell Papers_files"
-python3 -m http.server 8080
+python3 -m pip install -r backend/requirements.txt
+python3 scripts/build_parquet.py    # first time, or after CSV updates
+python3 -m uvicorn backend.app:app --reload --port 8000
 ```
 
-Open:
+Open [http://localhost:8000/fastpheno-dashboard.html](http://localhost:8000/fastpheno-dashboard.html)
 
-[http://localhost:8080/fastpheno-dashboard.html](http://localhost:8080/fastpheno-dashboard.html)
+Parquet files under `data/fastpheno/parquet/` are built from CSV exports and are **auto-rebuilt on API startup** if missing or stale. Raw CSVs and markdown are still served at `/api/data/fastpheno/` for full downloads.
 
-Any free port works (e.g. `8090` if `8080` is already in use).
+Optional: copy `backend/.env.example` to `backend/.env` and set `FASTPHENO_DATA_DIR` if your data directory is not the repo default.
+
+### Static file server (home page only)
+
+```bash
+python3 -m http.server 8090
+```
+
+Sensor views need the backend on port 8000 (or append `?api` when the dashboard is opened from another static host that proxies to the API).
+
+## Dashboard UX
+
+| Sensor | Site filter | Date modes | Chart |
+|--------|-------------|------------|-------|
+| Weather | PIK / PIN | Single day / Date range | Line (range) |
+| Fluorescence | PIK / PIN | Compare dates / Date range | Scatter-box |
+| Reflectance | PIK / PIN | Compare dates / Date range | Scatter-box |
+| Predawn WP | — | Compare dates / Date range | Scatter-box |
+| UAV Hyp_spec | PIK / PIN | Compare dates / Date range | Scatter-box (compare) / line (range) |
+
+**Compare dates** — pick up to four site+date series, overlay on one chart, paginated metric table below.
+
+**Date range** — filter all trees/measurements in a from/to window via the API (`all=true`).
+
+Data loads when you open a sensor tab (`ensureSensorReady`), not on initial page load.
 
 ## Project layout
 
 ```
 fastpheno-dashboard.html          # Main dashboard (UAV / Ground / Environmental schema)
-backend/                            # Auth prototype (PIN login API, Option C)
-data/fastpheno/                   # Browser-ready CSVs + metadata markdown
-scripts/prepare_fastpheno_data.py # Build derived CSVs from III_db_final
-scripts/verify_fastpheno_data.py  # Check derived CSVs against source
+backend/
+  app.py                            # FastAPI app, static files, Parquet warmup on startup
+  config.py                         # Paths, row limits
+  routers/
+    data_files.py                   # CSV/MD file serving
+    query.py                        # JSON query endpoints
+  services/
+    datasets.py                     # Dataset registry (CSV sources + Parquet paths)
+    parquet_store.py                # CSV → Parquet build / ensure
+    query_engine.py                 # DuckDB queries over Parquet
+data/fastpheno/                   # CSV exports + metadata markdown
+data/fastpheno/parquet/           # Query layer (generated; gitignored)
+scripts/
+  prepare_fastpheno_data.py       # Build derived CSVs from III_db_final
+  build_parquet.py                # Build Parquet from all CSV exports
+  consolidate_uav_reflectance.py  # Merge UAV source CSVs into year files
+  verify_fastpheno_data.py        # Check derived CSVs against source
 FASTPHENO_DB_INTEGRATION.md       # Integration options and longer design notes
-FastPheno_Project_Presentation_4x3.pptx  # Project status slides (4:3)
+```
+
+## API endpoints
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/health` | Health check, Parquet readiness |
+| `GET /api/query/datasets` | Catalog of all sensor domains |
+| `GET /api/query/{domain}/meta` | Sites, metrics, available dates, bounds |
+| `GET /api/query/{domain}/daily?metric=…` | Chart-ready daily series |
+| `GET /api/query/{domain}/rows` | Paginated filtered rows (`page`, `page_size`) |
+| `GET /api/query/{domain}/rows?all=true` | All matching rows (dashboard tables) |
+| `GET /api/data/fastpheno/{file}` | Raw CSV or markdown download |
+
+**Domains:** `weather`, `fluorescence`, `reflectance`, `wp`, `uav`
+
+**Common query params:** `site=PIK|PIN`, `from`, `to`, `all=true`
+
+**Weather:** `source=eccc|daymet` (required for weather rows/daily/meta)
+
+**UAV:** `site`, `from`, `to`, optional `year=2022|2023` (meta/daily); rows span both years when `year` is omitted
+
+Examples:
+
+```bash
+curl "http://localhost:8000/api/query/uav/meta?site=PIN"
+curl "http://localhost:8000/api/query/uav/rows?site=PIN&from=2023-05-08&to=2023-05-08&all=true"
+curl "http://localhost:8000/api/query/reflectance/meta?site=PIK"
+curl "http://localhost:8000/api/query/weather/rows?source=daymet&site=PIN&from=2023-06-01&to=2023-08-31&all=true"
 ```
 
 ## Data files (`data/fastpheno/`)
@@ -47,9 +117,8 @@ FastPheno_Project_Presentation_4x3.pptx  # Project status slides (4:3)
 | `fluorescence_indices.csv` | Combined fluorescence campaign rows |
 | `reflectance_indices.csv` | Combined reflectance index rows |
 | `predawn_wp_2023.csv` | Predawn water potential (2023) |
+| `uav_reflectance_2022.csv` / `uav_reflectance_2023.csv` | UAV tree-level index metrics |
 | `*.md` | Sensor metadata shown in the dashboard |
-
-Column definitions live in the matching `*_pin_2023.md` / `weather*.md` files.
 
 ## Regenerating data
 
@@ -62,123 +131,25 @@ Derived CSVs are produced from a local copy of `III_db_final`. By default the pr
 Update `SRC` in `scripts/prepare_fastpheno_data.py` if your source path differs, then run:
 
 ```bash
-python3 scripts/prepare_fastpheno_data.py
+python3 scripts/prepare_fastpheno_data.py        # writes CSVs; runs build_parquet at end
+python3 scripts/consolidate_uav_reflectance.py     # UAV CSVs; updates Parquet for UAV only
+python3 scripts/build_parquet.py                   # rebuild all Parquet (or --force)
 python3 scripts/verify_fastpheno_data.py
 ```
-
-Notes:
-
-- Full reflectance spectra (hundreds of wavelength columns) are **not** loaded into the browser; only index and metadata fields are kept.
-- Predawn WP is currently packaged as the 2023 export used by the dashboard; weather and phenotyping CSVs are regenerated by the prep script.
 
 ## Stack
 
 - HTML / CSS (BAR-style shell)
-- [PapaParse](https://www.papaparse.com/) — CSV loading
-- [Tabulator](http://tabulator.info/) — tables
+- [PapaParse](https://www.papaparse.com/) — CSV export downloads
+- [Tabulator](http://tabulator.info/) — paginated tables (`fitColumns` layout)
 - [Chart.js](https://www.chartjs.org/) — charts
+- FastAPI + DuckDB + Parquet — query API backend
 - Python 3 — data preparation and verification
-
-## Authentication (planned)
-
-Right now the dashboard is a **static site**: HTML + CSV files served by a simple web server. Anyone who can open the page can also download the data files. So login has to happen *before* those files are sent — a password box only in the webpage is not real security.
-
-### What to decide first
-
-1. **Who can get in?** Lab members only, UofT accounts, or a mix  
-2. **What is locked?** The webpage, the CSV data files, or both (lock the CSVs at minimum)  
-3. **Where will it run?** Local laptop demo vs BAR / department server vs cloud
-
-### Option A — Gate in front of the whole site (easiest soon)
-
-Put a lock on the door before anyone reaches the files.
-
-Examples: **HTTP basic auth** (shared password on the web server), **nginx** / Apache access rules, **Cloudflare Access**, or campus login in front of a static folder.
-
-- Dashboard code can stay mostly the same  
-- Good for: “only our lab should open this”  
-- Limit: usually all-or-nothing (whole site or folders), not fine-grained per person/dataset
-
-### Option B — University SSO (good for BAR / official hosting)
-
-**SSO (single sign-on)** means people log in with their school account (e.g. UofT / Shibboleth / SAML / OIDC) instead of inventing a new password for this app.
-
-- Identity comes from the university; the app trusts that login  
-- Good for: professors, students, audit trail (“who accessed this?”)  
-- Needs proper hosting that supports SSO — not just `python3 -m http.server` on a laptop
-
-### Option C — Small backend + sessions (if permissions get fancier)
-
-Add a thin **API server** (e.g. FastAPI or Flask) that checks login and then serves data:
-
-```text
-Browser → login / API server → CSVs or database
-```
-
-The page would fetch `/api/...` with credentials instead of open files under `data/fastpheno/`.
-
-Login methods this backend could use:
-
-- Campus **SSO** (above)  
-- Simple lab accounts  
-- **Email + PIN** — user enters email → server emails a 6-digit code → user types the code to sign in. Codes expire and work only once. Allowed emails can be limited (e.g. `@utoronto.ca` or a lab allow-list).
-
-Good for: different roles (viewer vs collaborator), per-dataset access, later growth toward a shared team tool.
-
-### What not to do
-
-Hiding the UI with JavaScript, or relying on a “secret URL,” while leaving `data/fastpheno/*.csv` publicly downloadable.
-
-### Suggested path for this project
-
-| When | What |
-|------|------|
-| **Soon** | Keep the static UI; put the HTML + `data/fastpheno/` behind a proxy password or campus SSO for any shared/deployed copy. Local demos can stay unlocked. |
-| **Next** | If needed, add a small API so CSVs are only available after login (`fetch` with session cookie / credentials). |
-| **Later** | Roles, optional per-domain access (e.g. UAV vs Ground), and access logging if required. |
-
-For longer backend / database options, see [`FASTPHENO_DB_INTEGRATION.md`](./FASTPHENO_DB_INTEGRATION.md).
-
-### Auth prototype (Option C — email PIN)
-
-A small FastAPI server protects CSV downloads behind login. In dev mode, PINs print to the terminal and login page (no SMTP required).
-
-```bash
-cd "/path/to/PCA_C-SPIRIT Single Cell Papers_files"
-python3 -m pip install -r backend/requirements.txt
-uvicorn backend.app:app --reload --port 8000
-```
-
-1. Open [http://localhost:8000/login](http://localhost:8000/login)
-2. Enter your email → copy the 6-digit code from the page (or terminal in dev mode)
-3. Enter the code → you’re signed in at [http://localhost:8000/fastpheno-dashboard.html](http://localhost:8000/fastpheno-dashboard.html)
-
-#### Enable real email (SMTP)
-
-```bash
-cp backend/.env.example backend/.env
-# Edit backend/.env: set FASTPHENO_DEV_PRINT_PINS=0 and your SMTP_* values
-python3 -m pip install -r backend/requirements.txt
-uvicorn backend.app:app --reload --port 8000
-```
-
-The server loads `backend/.env` automatically on startup. With Gmail, use an [app password](https://myaccount.google.com/apppasswords), not your normal password. Set `FASTPHENO_ALLOWED_EMAILS` to restrict who can sign in.
-
-| Route | Purpose |
-|-------|---------|
-| `GET /login` | Sign-in page |
-| `POST /login` | Request a 6-digit code |
-| `POST /login/verify` | Submit code and create session |
-| `GET /api/auth/me` | Current session |
-| `GET /api/data/fastpheno/{file}` | Protected CSV/MD (session required) |
-
-The plain `python3 -m http.server` workflow still works without auth (`./data/fastpheno/`). Port **8000** switches the dashboard to the protected API automatically.
 
 ## Related docs
 
 - [`FASTPHENO_DB_INTEGRATION.md`](./FASTPHENO_DB_INTEGRATION.md) — design options (static CSV vs SQLite vs API) and file inventory
-- [`FastPheno_Project_Presentation_4x3.pptx`](./FastPheno_Project_Presentation_4x3.pptx) — short status presentation for meetings
 
 ## Status
 
-Current build is a research prototype organized by the wider FastPheno schema (UAV, Ground Data, Environmental Data). Climate, fluorescence, leaf reflectance, and predawn WP are available; other entities are blank placeholders. Broader cross-domain joins and additional domains remain future work — see the integration doc for planned paths.
+Current build: unified query API over Parquet for all sensors, lazy loading, compare/range modes for ground campaigns and UAV, Daymet + ECCC weather, and full-width Tabulator tables. Auth/login from an earlier prototype has been removed. Broader cross-domain joins and additional ERD entities remain future work.

@@ -206,6 +206,19 @@ def main():
     print(f"weather: PIK/PIN Daymet daily 2010-2024 built")
     print(f"fluorescence_indices.csv: {len(fluor)} rows")
     print(f"reflectance_indices.csv: {len(refl)} rows")
+    build_parquet()
+
+
+def build_parquet():
+    import sys
+
+    root = Path(__file__).resolve().parents[1]
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    from backend.services.parquet_store import build_all
+
+    paths = build_all(force=True)
+    print(f"parquet: {len(paths)} file(s) in data/fastpheno/parquet/")
 
 
 if __name__ == "__main__":

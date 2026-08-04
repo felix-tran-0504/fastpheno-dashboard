@@ -92,10 +92,14 @@
     #weather-table.data-table,
     #fluorescence-table.data-table,
     #reflectance-table.data-table,
-    #summary-table.data-table { overflow-x: auto; max-width: 100%; }
+    #summary-table.data-table,
+    #uav-table.data-table { overflow-x: auto; max-width: 100%; }
+    .tabulator .tabulator-tableholder { background: #fff; }
+    .tabulator .tabulator-table { min-width: 100%; }
     #weather-table.tabulator,
     #fluorescence-table.tabulator,
-    #reflectance-table.tabulator { min-width: 100%; }
+    #reflectance-table.tabulator,
+    #uav-table.tabulator { min-width: 100%; }
     .data-table-footer {
       display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin: 8px 0 12px;
     }
@@ -103,12 +107,12 @@
     /* Critical Tabulator grid layout — keeps tables readable if tabulator.min.css fails to load */
     .tabulator { overflow: hidden; position: relative; border: 1px solid #999; background: #fff; }
     .tabulator .tabulator-header { overflow: hidden; position: relative; white-space: nowrap; background: #e6e6e6; border-bottom: 1px solid #999; }
-    .tabulator .tabulator-header .tabulator-headers { display: inline-block; white-space: nowrap; }
+    .tabulator .tabulator-header .tabulator-headers { display: block; width: 100%; white-space: nowrap; }
     .tabulator .tabulator-col { display: inline-flex; position: relative; vertical-align: top; box-sizing: border-box; }
     .tabulator .tabulator-row { position: relative; white-space: nowrap; box-sizing: border-box; min-height: 22px; }
     .tabulator .tabulator-row .tabulator-cell { display: inline-block; position: relative; box-sizing: border-box; padding: 4px; vertical-align: middle; white-space: nowrap; overflow: hidden; }
     .tabulator .tabulator-tableholder { overflow: auto; position: relative; width: 100%; }
-    .tabulator .tabulator-table { position: relative; display: inline-block; white-space: nowrap; }
+    .tabulator .tabulator-table { position: relative; display: block; width: 100%; min-width: 100%; white-space: nowrap; }
     .metadata-panel { margin: 0 0 20px; padding: 10px 12px; background: #fafafa; border: 1px solid #ddd; font-size: 8pt; color: #444; }
     .metadata-panel h3 { font-size: 10pt; color: #336633; margin: 0 0 8px; }
     .metadata-panel h4 { font-size: 9pt; color: #666; margin: 12px 0 6px; }
@@ -202,13 +206,6 @@
       </td>
     </tr>
   </table>
-
-  <div class="prototype-banner" id="auth-user-bar" style="display:none; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-    <span id="auth-user-email" style="font-size:9pt;"></span>
-    <form method="post" action="/auth/logout" style="margin:0;">
-      <button type="submit" class="btn" style="font-size:9pt;">Sign out</button>
-    </form>
-  </div>
 
   <div class="prototype-banner">
     Navigation follows the FastPheno schema: <strong>UAV</strong>, <strong>Ground Data</strong>, and <strong>Environmental Data</strong>.
@@ -416,6 +413,53 @@
           <button type="button" class="btn" id="wp-clear-series" disabled>Clear</button>
         </div>
       </div>
+      <div id="uav-site-control" class="is-hidden">
+        <label for="uav-site">Site</label>
+        <select id="uav-site">
+          <option value="PIN" selected>Pintendre (PIN)</option>
+          <option value="PIK">Pickering (PIK)</option>
+        </select>
+      </div>
+      <div id="uav-metric-control" class="is-hidden">
+        <label for="uav-metric">Metric</label>
+        <select id="uav-metric"></select>
+      </div>
+      <div id="uav-date-mode-control" class="is-hidden">
+        <label>View</label>
+        <div class="mode-toggle" id="uav-mode-toggle">
+          <button type="button" class="active" data-mode="compare">Compare dates</button>
+          <button type="button" data-mode="range">Date range</button>
+        </div>
+      </div>
+      <div id="uav-filter-group" class="is-hidden">
+        <label>Date</label>
+        <div class="date-filter-group">
+          <select id="uav-flt-year" aria-label="UAV flight year">
+            <option value="">Year</option>
+          </select>
+          <select id="uav-flt-month" aria-label="UAV flight month">
+            <option value="">Month</option>
+          </select>
+          <select id="uav-flt-day" aria-label="UAV flight day">
+            <option value="">Day</option>
+          </select>
+        </div>
+      </div>
+      <div id="uav-compare-actions" class="is-hidden">
+        <label>&nbsp;</label>
+        <div class="btn-row">
+          <button type="button" class="btn primary" id="uav-add-series">Add series</button>
+          <button type="button" class="btn" id="uav-clear-series" disabled>Clear</button>
+        </div>
+      </div>
+      <div id="uav-range-from" class="is-hidden">
+        <label for="uav-from-date">From</label>
+        <input type="date" id="uav-from-date">
+      </div>
+      <div id="uav-range-to" class="is-hidden">
+        <label for="uav-to-date">To</label>
+        <input type="date" id="uav-to-date">
+      </div>
       </div>
     </div>
 
@@ -480,6 +524,28 @@
     </div>
   </div>
 
+  <div id="uav-section" class="is-hidden">
+    <div class="series-chips" id="uav-series-chips" aria-live="polite"></div>
+    <div class="compare-empty" id="uav-compare-empty">
+      Choose a metric, site, and flight date, then click <strong>Add series</strong> to build a comparison chart.
+    </div>
+    <div id="uav-range-label" class="range-label is-hidden"></div>
+    <div class="chart-box is-hidden" id="uav-chart-box">
+      <h3 id="uav-chart-title">UAV hyperspectral — daily means</h3>
+      <div class="chart-canvas"><canvas id="uav-chart"></canvas></div>
+    </div>
+    <div id="uav-count" class="dataset-count"></div>
+    <div id="uav-table" class="data-table"></div>
+    <div id="uav-table-footer" class="data-table-footer is-hidden">
+      <button type="button" class="btn" id="uav-download-csv">Download table (CSV)</button>
+      <button type="button" class="btn" id="uav-download-full-csv">Download full dataset (CSV)</button>
+    </div>
+    <div id="uav-metadata" class="metadata-panel">
+      <h3>UAV hyperspectral reflectance</h3>
+      <p>Tree-level index metrics from UAV flights (NDVI, GNDVI, PRI, etc.) for 2022 and 2023. In backend mode, charts and tables load via the query API so large year files are not parsed in the browser.</p>
+    </div>
+  </div>
+
   <div id="wp-section">
     <div class="series-chips" id="wp-series-chips" aria-live="polite"></div>
     <div class="compare-empty" id="wp-compare-empty">
@@ -501,34 +567,65 @@
   </div>
 
 <script>
-const DATA_BASE = (() => {
-  const authApi = location.port === "8000" || new URLSearchParams(location.search).has("auth");
-  return authApi ? "/api/data/fastpheno/" : "./data/fastpheno/";
-})();
-const AUTH_API_MODE = DATA_BASE.startsWith("/api/");
+let apiMode = location.port === "8000" || new URLSearchParams(location.search).has("api");
+let DATA_BASE = apiMode ? "/api/data/fastpheno/" : "./data/fastpheno/";
+let QUERY_BASE = apiMode ? "/api/query" : null;
+
+async function ensureApiMode() {
+  if (QUERY_BASE) return true;
+  try {
+    const response = await fetch("/api/health");
+    if (response.ok) {
+      apiMode = true;
+      DATA_BASE = "/api/data/fastpheno/";
+      QUERY_BASE = "/api/query";
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
+function parseApiError(detail, status) {
+  try {
+    const parsed = JSON.parse(detail);
+    if (parsed?.detail) return typeof parsed.detail === "string" ? parsed.detail : JSON.stringify(parsed.detail);
+  } catch {}
+  return detail || `Query failed: ${status}`;
+}
 
 function dataFetch(url) {
-  return fetch(url, AUTH_API_MODE ? { credentials: "include" } : {}).then(r => {
-    if (AUTH_API_MODE && r.status === 401) {
-      const next = encodeURIComponent(location.pathname + location.search + location.hash);
-      location.href = `/login?next=${next}`;
-      throw new Error("Unauthorized");
-    }
-    return r;
-  });
+  return fetch(url);
 }
 
-function ensureAuth() {
-  if (!AUTH_API_MODE) return Promise.resolve();
-  return fetch("/api/auth/me", { credentials: "include" }).then(r => {
-    if (!r.ok) {
-      const next = encodeURIComponent(location.pathname + location.search + location.hash);
-      location.href = `/login?next=${next}`;
-      throw new Error("Unauthorized");
-    }
-    return r.json();
-  });
+async function queryJson(path) {
+  if (!QUERY_BASE) throw new Error("Query API requires the FastAPI backend (port 8000 or ?api)");
+  const response = await dataFetch(QUERY_BASE + path);
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(parseApiError(detail, response.status));
+  }
+  return response.json();
 }
+
+function buildQuery(path, params = {}) {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value != null && value !== "") qs.set(key, String(value));
+  });
+  return `${path}?${qs.toString()}`;
+}
+
+const CAMPAIGN_KIND_TO_DOMAIN = { fluor: "fluorescence", refl: "reflectance", wp: "wp" };
+const campaignMeta = { fluor: null, refl: null, wp: null };
+const campaignMetaKey = { fluor: "", refl: "", wp: "" };
+const campaignRowCache = new Map();
+const campaignRangeRows = { fluor: [], refl: [], wp: [] };
+const campaignRequestId = { fluor: 0, refl: 0, wp: 0 };
+let weatherMeta = null;
+let weatherMetaKey = "";
+let weatherRows = [];
+let weatherRequestId = 0;
+let dashboardReady = false;
 const WEATHER_METRICS_ECCC = [
   { field: "lat", label: "Latitude (°)", chartLabel: "Interpolated latitude (°)", minWidth: 100 },
   { field: "lon", label: "Longitude (°)", chartLabel: "Interpolated longitude (°)", minWidth: 100 },
@@ -595,6 +692,7 @@ const WP_COLUMNS = [
 const COMPARE_COLORS = ["#336633", "#cc6600", "#4169E1", "#993366", "#2F4F4F"];
 const COMPARE_MAX_SERIES = 4;
 const COMPARE_KINDS = ["fluor", "refl", "wp"];
+const TABULATOR_TABLE_OPTS = { layout: "fitColumns", renderVertical: "basic" };
 const ERD_DOMAINS = {
   uav: {
     id: "uav",
@@ -602,7 +700,7 @@ const ERD_DOMAINS = {
     blurb: "Airborne tree-level products keyed by primary_key (e.g. PIK_1001).",
     entities: [
       { id: "lidar", title: "LiDAR", desc: "Tree height, location, and structural metrics.", pk: "primary_key", available: false },
-      { id: "hyp_spec", title: "Hyp_spec", desc: "UAV hyperspectral reflectance.", pk: "primary_key", available: false },
+      { id: "hyp_spec", title: "Hyp_spec", desc: "UAV hyperspectral reflectance indices.", pk: "primary_key", available: true, sensor: "uav" },
       { id: "gnss", title: "GNSS", desc: "Tree geolocation and GNSS metadata.", pk: "primary_key", available: false },
     ],
   },
@@ -638,32 +736,167 @@ const SENSORS = {
   fluorescence: { title: "Fluorescence", sectionId: "fluorescence-section", hasData: () => hasFluorescenceData(), domain: "ground", entity: "fluorescence" },
   reflectance: { title: "Leaf_reflectance", sectionId: "reflectance-section", hasData: () => hasReflectanceData(), domain: "ground", entity: "leaf_reflectance" },
   wp: { title: "WP", sectionId: "wp-section", hasData: () => hasWPData(), domain: "ground", entity: "wp" },
+  uav: { title: "Hyp_spec", sectionId: "uav-section", hasData: () => hasUavData(), domain: "uav", entity: "hyp_spec" },
 };
 
 let activeDomain = null;
 let activeEntity = null;
 let activeSensor = null;
-let weatherEcccPIK = [], weatherEcccPIN = [], weatherDaymetPIK = [], weatherDaymetPIN = [];
-let reflectance = [], fluorescence = [], predawnWP = [];
 let reflectanceFieldOrder = [], fluorescenceFieldOrder = [];
+let uavMeta = null;
+let uavTableRows = [];
+let uavTableTotal = 0;
+let uavRequestId = 0;
+let lastUavSite = null;
+let uavMetaSite = null;
+let uavDateMode = "compare";
+let uavCompareSeries = [];
+const uavSeriesRowCache = new Map();
 let charts = {};
-let weatherTable, fluorescenceTable, reflectanceTable, wpTable;
+let weatherTable, fluorescenceTable, reflectanceTable, wpTable, uavTable;
 let weatherDateMode = "single";
 let campaignDateMode = { fluor: "compare", refl: "compare", wp: "compare" };
 /** @type {{ fluor: {site?: string, date: string}[], refl: {site?: string, date: string}[], wp: {date: string}[] }} */
 let compareSeries = { fluor: [], refl: [], wp: [] };
 
-function loadCSV(path, withFields = false) {
-  return dataFetch(path).then(r => {
-    if (!r.ok) throw new Error("Failed to load " + path);
-    return r.text();
-  }).then(text => {
-    const parsed = Papa.parse(text, { header: true, skipEmptyLines: true, dynamicTyping: true });
-    if (withFields) {
-      return { data: parsed.data, fields: parsed.meta.fields || [] };
-    }
-    return parsed.data;
+function hasSensorApi() { return !!QUERY_BASE; }
+
+async function loadCampaignMeta(kind) {
+  const domain = CAMPAIGN_KIND_TO_DOMAIN[kind];
+  const site = compareUsesSite(kind) ? getCompareSite(kind) : null;
+  const key = `${domain}:${site || "all"}`;
+  if (campaignMeta[kind] && campaignMetaKey[kind] === key) return campaignMeta[kind];
+  const params = {};
+  if (site) params.site = site;
+  const meta = await queryJson(buildQuery(`/${domain}/meta`, params));
+  campaignMeta[kind] = meta;
+  campaignMetaKey[kind] = key;
+  if (kind === "fluor") fluorescenceFieldOrder = meta.fields || [];
+  if (kind === "refl") reflectanceFieldOrder = meta.fields || [];
+  return meta;
+}
+
+async function fetchCampaignRows(kind, { site, from, to } = {}) {
+  const domain = CAMPAIGN_KIND_TO_DOMAIN[kind];
+  const params = { all: "true" };
+  if (site) params.site = site;
+  if (from) params.from = from;
+  if (to) params.to = to;
+  const payload = await queryJson(buildQuery(`/${domain}/rows`, params));
+  return payload.rows || [];
+}
+
+function campaignSeriesCacheKey(kind, series) {
+  return `${kind}__${compareSeriesKey(kind, series)}`;
+}
+
+async function fetchCampaignRowsForSeries(kind, series) {
+  const key = campaignSeriesCacheKey(kind, series);
+  if (campaignRowCache.has(key)) return campaignRowCache.get(key);
+  const rows = await fetchCampaignRows(kind, {
+    site: series.site,
+    from: series.date,
+    to: series.date,
   });
+  campaignRowCache.set(key, rows);
+  return rows;
+}
+
+async function loadWeatherMeta() {
+  const source = getWeatherSource();
+  const siteFilter = document.getElementById("site-filter")?.value || "all";
+  const apiSite = siteFilter === "all" ? null : siteFilter;
+  const key = `${source}:${siteFilter}`;
+  if (weatherMeta && weatherMetaKey === key) return weatherMeta;
+  const params = { source };
+  if (apiSite) params.site = apiSite;
+  weatherMeta = await queryJson(buildQuery("/weather/meta", params));
+  weatherMetaKey = key;
+  return weatherMeta;
+}
+
+async function fetchWeatherRows() {
+  const source = getWeatherSource();
+  const siteFilter = document.getElementById("site-filter")?.value || "all";
+  const params = { source, all: "true" };
+  if (siteFilter !== "all") params.site = siteFilter;
+  if (weatherDateMode === "single") {
+    const d = document.getElementById("weather-date")?.value || "";
+    if (d) { params.from = d; params.to = d; }
+  } else {
+    const from = document.getElementById("weather-from-date")?.value || "";
+    const to = document.getElementById("weather-to-date")?.value || "";
+    if (from) params.from = from;
+    if (to) params.to = to;
+  }
+  const payload = await queryJson(buildQuery("/weather/rows", params));
+  weatherRows = payload.rows || [];
+  return weatherRows;
+}
+
+async function ensureSensorReady(sensorId) {
+  if (!QUERY_BASE) return false;
+  if (sensorId === "weather") {
+    await loadWeatherMeta();
+    syncWeatherDateInputs(true);
+    return true;
+  }
+  if (sensorId === "fluorescence") {
+    await loadCampaignMeta("fluor");
+    populateFluorescenceMetricFilter();
+    populateCompareDateFilters("fluor", { reset: true });
+    if (isCampaignRangeMode("fluor")) syncCampaignDateInputs("fluor", true);
+    return true;
+  }
+  if (sensorId === "reflectance") {
+    await loadCampaignMeta("refl");
+    populateReflectanceMetricFilter();
+    populateCompareDateFilters("refl", { reset: true });
+    if (isCampaignRangeMode("refl")) syncCampaignDateInputs("refl", true);
+    return true;
+  }
+  if (sensorId === "wp") {
+    await loadCampaignMeta("wp");
+    populateCompareDateFilters("wp", { reset: true });
+    if (isCampaignRangeMode("wp")) syncCampaignDateInputs("wp", true);
+    return true;
+  }
+  if (sensorId === "uav") {
+    await loadUavMeta();
+    populateUavMetricFilter();
+    syncUavCompareMetricLock();
+    if (isUavRangeMode()) syncUavDateInputs(true);
+    else populateUavFlightDateFilters({ reset: true });
+    return true;
+  }
+  return true;
+}
+
+function loadSensorMetadata(sensorId) {
+  const panels = {
+    fluorescence: { id: "fluorescence-metadata", path: "fluorescence_pin_2023.md" },
+    reflectance: { id: "reflectance-metadata", path: "reflectance_pin_2023.md" },
+    wp: { id: "wp-metadata", path: "predawn_wp_pin_2023.md" },
+  }[sensorId];
+  if (!panels) {
+    if (sensorId === "weather") return loadWeatherMetadata();
+    return Promise.resolve();
+  }
+  const panel = document.getElementById(panels.id);
+  if (!panel || panel.dataset.loaded === "1") return Promise.resolve();
+  panel.classList.add("loading");
+  return loadMarkdown(DATA_BASE + panels.path)
+    .then(md => {
+      let content = md;
+      if (panels.path === "reflectance_pin_2023.md") content = stripReflectanceBoilerplate(md);
+      panel.innerHTML = renderMarkdown(content);
+      panel.classList.remove("loading");
+      panel.dataset.loaded = "1";
+    })
+    .catch(err => {
+      panel.textContent = "Metadata unavailable: " + err.message;
+      panel.classList.remove("loading");
+    });
 }
 
 function loadMarkdown(path) {
@@ -789,22 +1022,8 @@ function getCampaignDate(prefix) {
 }
 
 function getCompareDataset(kind) {
-  if (kind === "fluor") return fluorescence;
-  if (kind === "refl") return reflectance;
-  return predawnWP;
-}
-
-function compareUsesSite(kind) {
-  return kind === "fluor" || kind === "refl";
-}
-
-function compareSeriesKey(kind, series) {
-  return compareUsesSite(kind) ? `${series.site}__${series.date}` : series.date;
-}
-
-function getCompareSite(kind) {
-  if (!compareUsesSite(kind)) return null;
-  return document.getElementById(`${kind}-site`)?.value || "PIN";
+  if (isCampaignRangeMode(kind)) return campaignRangeRows[kind] || [];
+  return getCompareRows(kind);
 }
 
 function getAvailableCompareDates(kind) {
@@ -814,14 +1033,8 @@ function getAvailableCompareDates(kind) {
       .filter(s => !compareUsesSite(kind) || s.site === site)
       .map(s => s.date)
   );
-  return [...new Set(
-    getCompareDataset(kind)
-      .filter(r => site == null || String(r.site || "").toUpperCase() === site)
-      .map(r => parseDateValue(r.date))
-      .filter(Boolean)
-  )]
-    .filter(d => !used.has(d))
-    .sort();
+  const dates = (campaignMeta[kind]?.available_dates || []).slice();
+  return dates.filter(d => !used.has(d)).sort();
 }
 
 function shortCompareDateLabel(iso) {
@@ -841,6 +1054,19 @@ function compareSeriesFullLabel(kind, series) {
   return compareUsesSite(kind)
     ? `${series.site} · ${formatWeatherDisplay(series.date)}`
     : formatWeatherDisplay(series.date);
+}
+
+function compareUsesSite(kind) {
+  return kind === "fluor" || kind === "refl";
+}
+
+function compareSeriesKey(kind, series) {
+  return compareUsesSite(kind) ? `${series.site}__${series.date}` : series.date;
+}
+
+function getCompareSite(kind) {
+  if (!compareUsesSite(kind)) return null;
+  return document.getElementById(`${kind}-site`)?.value || "PIN";
 }
 
 function populateCompareDateFilters(kind, { reset = false, cascadeFrom = null } = {}) {
@@ -935,7 +1161,7 @@ function renderCompareSeriesChips(kind) {
   });
 }
 
-function addCompareSeries(kind) {
+async function addCompareSeries(kind) {
   const date = getCampaignDate(kind);
   if (!date) return;
   const next = compareUsesSite(kind)
@@ -943,29 +1169,29 @@ function addCompareSeries(kind) {
     : { date };
   if (compareSeries[kind].some(s => compareSeriesKey(kind, s) === compareSeriesKey(kind, next))) return;
   if (compareSeries[kind].length >= COMPARE_MAX_SERIES) return;
+  await fetchCampaignRowsForSeries(kind, next);
   compareSeries[kind] = [...compareSeries[kind], next];
-  refreshCompareSection(kind);
+  await refreshCompareSection(kind);
 }
 
 function clearCompareSeries(kind) {
   compareSeries[kind] = [];
+  [...campaignRowCache.keys()].forEach(key => {
+    if (key.startsWith(`${kind}__`)) campaignRowCache.delete(key);
+  });
   refreshCompareSection(kind);
 }
 
-function refreshCompareSection(kind) {
-  if (kind === "fluor") updateFluorescenceSection();
-  else if (kind === "refl") updateReflectanceSection();
-  else updateWPSection();
+async function refreshCompareSection(kind) {
+  if (kind === "fluor") await updateFluorescenceSection();
+  else if (kind === "refl") await updateReflectanceSection();
+  else await updateWPSection();
 }
 
 function getCompareRows(kind) {
   const seriesList = compareSeries[kind];
   if (!seriesList.length) return [];
-  const data = getCompareDataset(kind);
-  return seriesList.flatMap(series => data.filter(r => {
-    if (compareUsesSite(kind) && String(r.site || "").toUpperCase() !== series.site) return false;
-    return parseDateValue(r.date) === series.date;
-  }));
+  return seriesList.flatMap(series => campaignRowCache.get(campaignSeriesCacheKey(kind, series)) || []);
 }
 
 function formatCompareCount(kind, count, label) {
@@ -976,10 +1202,7 @@ function formatCompareCount(kind, count, label) {
 
 function buildCompareChartGroups(kind, metric) {
   return compareSeries[kind].map((series, index) => {
-    const rows = getCompareDataset(kind).filter(r => {
-      if (compareUsesSite(kind) && String(r.site || "").toUpperCase() !== series.site) return false;
-      return parseDateValue(r.date) === series.date;
-    });
+    const rows = campaignRowCache.get(campaignSeriesCacheKey(kind, series)) || [];
     const points = rows.map((row, pointIndex) => ({
       y: parseMetricValue(row[metric.field]),
       label: row.primary_key || row.sample || row.Measurement_ID
@@ -1080,11 +1303,13 @@ function getVariableCampaignMetrics(rows, fieldOrder) {
 }
 
 function getVariableFluorescenceChartMetrics() {
-  return getVariableCampaignMetrics(fluorescence, fluorescenceFieldOrder);
+  const rows = getCompareRows("fluor").length ? getCompareRows("fluor") : campaignRangeRows.fluor;
+  return getVariableCampaignMetrics(rows, fluorescenceFieldOrder);
 }
 
 function getVariableReflectanceChartMetrics() {
-  return getVariableCampaignMetrics(reflectance, reflectanceFieldOrder);
+  const rows = getCompareRows("refl").length ? getCompareRows("refl") : campaignRangeRows.refl;
+  return getVariableCampaignMetrics(rows, reflectanceFieldOrder);
 }
 
 function getWeatherMetricSiteGroups(rows) {
@@ -1129,7 +1354,27 @@ function getVariableWeatherMetrics(rows, metrics) {
 }
 
 function getVariableWeatherMetricsForCurrentData() {
-  return getVariableWeatherMetrics(getWeatherBaseRows(), getWeatherMetrics());
+  return getVariableWeatherMetrics(weatherRows, getWeatherMetrics());
+}
+
+function getWeatherBaseRows() {
+  return weatherRows.slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+}
+
+function getWeatherAvailableDates() {
+  return (weatherMeta?.available_dates || []).slice().sort();
+}
+
+function getWeatherDateBounds() {
+  const source = getWeatherSource();
+  const siteFilter = document.getElementById("site-filter")?.value || "all";
+  const bounds = weatherMeta?.bounds?.[source];
+  if (!bounds) return null;
+  const sites = siteFilter === "all" ? ["PIK", "PIN"] : [siteFilter];
+  const mins = sites.map(s => bounds[s]?.min_date).filter(Boolean).map(d => String(d).slice(0, 10));
+  const maxs = sites.map(s => bounds[s]?.max_date).filter(Boolean).map(d => String(d).slice(0, 10));
+  if (!mins.length || !maxs.length) return null;
+  return { first: mins.sort()[0], last: maxs.sort().slice(-1)[0] };
 }
 
 function formatWeatherDetailValue(raw) {
@@ -1147,21 +1392,6 @@ function formatWeatherDisplay(dateStr) {
   const [y, m, d] = dateStr.split("-").map(Number);
   const dt = new Date(y, m - 1, d);
   return dt.toLocaleDateString("en-CA", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
-}
-
-function getWeatherBaseRows() {
-  return [...filterBySite(getActiveWeatherPIK(), "site_id"), ...filterBySite(getActiveWeatherPIN(), "site_id")]
-    .sort((a, b) => a.date.localeCompare(b.date));
-}
-
-function getWeatherAvailableDates() {
-  return [...new Set(getWeatherBaseRows().map(r => r.date))].sort();
-}
-
-function getWeatherDateBounds() {
-  const rows = getWeatherBaseRows();
-  if (!rows.length) return null;
-  return { first: rows[0].date, last: rows[rows.length - 1].date };
 }
 
 function addCalendarDay(dateStr) {
@@ -1273,25 +1503,27 @@ function enforceWeatherDateRange(changed = null) {
 }
 
 function syncWeatherDateInputs(reset = false) {
-  const rows = getWeatherBaseRows();
+  const dates = getWeatherAvailableDates();
+  const bounds = getWeatherDateBounds();
   const dateInput = document.getElementById("weather-date");
   const fromInput = document.getElementById("weather-from-date");
   const toInput = document.getElementById("weather-to-date");
-  if (!rows.length) {
+  if (!dates.length || !bounds) {
     [dateInput, fromInput, toInput].forEach(el => { if (el) { el.min = ""; el.max = ""; el.value = ""; } });
     return;
   }
-  const first = rows[0].date;
-  const last = rows[rows.length - 1].date;
-  const mid = rows[Math.floor(rows.length / 2)].date;
+  const first = bounds.first;
+  const last = bounds.last;
+  const mid = dates[Math.floor(dates.length / 2)];
   [dateInput, fromInput, toInput].forEach(el => {
     if (el) { el.min = first; el.max = last; }
   });
   if (reset || !dateInput.value || dateInput.value < first || dateInput.value > last) {
     dateInput.value = mid;
   }
+  const defaultFrom = dates[Math.max(0, dates.length - 14)] || first;
   if (reset || !fromInput.value || fromInput.value < first || fromInput.value > last) {
-    fromInput.value = rows[Math.max(0, rows.length - 14)].date;
+    fromInput.value = defaultFrom;
   }
   if (reset || !toInput.value || toInput.value < first || toInput.value > last) {
     toInput.value = last;
@@ -1344,21 +1576,14 @@ function isCampaignRangeMode(kind) {
   return campaignDateMode[kind] === "range";
 }
 
-function getCampaignBaseRows(kind) {
-  if (kind === "wp") {
-    return predawnWP
-      .slice()
-      .sort((a, b) => (parseDateValue(a.date) || "").localeCompare(parseDateValue(b.date) || ""));
-  }
-  const site = getCompareSite(kind);
-  return getCompareDataset(kind)
-    .filter(r => String(r.site || "").toUpperCase() === site)
-    .slice()
-    .sort((a, b) => (parseDateValue(a.date) || "").localeCompare(parseDateValue(b.date) || ""));
-}
-
 function getCampaignDateBounds(kind) {
-  const dates = [...new Set(getCampaignBaseRows(kind).map(r => parseDateValue(r.date)).filter(Boolean))].sort();
+  const meta = campaignMeta[kind];
+  const dates = (meta?.available_dates || []).slice().sort();
+  if (!dates.length && meta?.bounds?.min_date) {
+    const first = String(meta.bounds.min_date).slice(0, 10);
+    const last = String(meta.bounds.max_date).slice(0, 10);
+    return { first, last, dates: [first, last] };
+  }
   if (!dates.length) return null;
   return { first: dates[0], last: dates[dates.length - 1], dates };
 }
@@ -1448,7 +1673,7 @@ function matchesCampaignDateFilter(kind, row) {
 }
 
 function getCampaignRangeRows(kind) {
-  return getCampaignBaseRows(kind).filter(row => matchesCampaignDateFilter(kind, row));
+  return campaignRangeRows[kind] || [];
 }
 
 function formatCampaignRangeCount(kind, count) {
@@ -1500,7 +1725,8 @@ function getCampaignRangeDownloadFilename(kind) {
 }
 
 function getWPRangeTableColumns() {
-  const fields = predawnWP[0] ? Object.keys(predawnWP[0]) : ["site", "date", "Cluster", "Genotype", "wp_pd"];
+  const sample = campaignRangeRows.wp[0] || getCompareRows("wp")[0];
+  const fields = sample ? Object.keys(sample) : (campaignMeta.wp?.fields || ["site", "date", "Cluster", "Genotype", "wp_pd"]);
   return buildDataTableColumns(fields);
 }
 
@@ -1554,7 +1780,11 @@ function updateCampaignRangeChart(kind, rows) {
   });
 }
 
-function updateCampaignSection(kind) {
+function buildUavQuery(path, params) {
+  return buildQuery(path, params);
+}
+
+async function updateCampaignSection(kind) {
   const config = {
     fluor: {
       hasData: hasFluorescenceData,
@@ -1611,8 +1841,23 @@ function updateCampaignSection(kind) {
 
   if (!config.hasData()) return;
 
+  const requestId = ++campaignRequestId[kind];
+
   if (isCampaignRangeMode(kind)) {
     syncCampaignDateInputs(kind);
+    const from = document.getElementById(`${kind}-from-date`)?.value || "";
+    const to = document.getElementById(`${kind}-to-date`)?.value || "";
+    const site = compareUsesSite(kind) ? getCompareSite(kind) : null;
+    document.getElementById(config.countId).textContent = "Loading…";
+    try {
+      campaignRangeRows[kind] = await fetchCampaignRows(kind, { site, from, to });
+    } catch (err) {
+      if (requestId !== campaignRequestId[kind]) return;
+      console.error(err);
+      document.getElementById(config.countId).textContent = "Data unavailable: " + err.message;
+      return;
+    }
+    if (requestId !== campaignRequestId[kind]) return;
     const rows = getCampaignRangeRows(kind);
     const hasRows = rows.length > 0;
 
@@ -1648,8 +1893,8 @@ function updateCampaignSection(kind) {
         table.setData(rows);
       } else {
         config.setTable(new Tabulator(config.tableSelector, {
+          ...TABULATOR_TABLE_OPTS,
           data: rows,
-          layout: "fitColumns",
           pagination: true,
           paginationSize: 15,
           columns: cols,
@@ -1665,6 +1910,35 @@ function updateCampaignSection(kind) {
     }
     return;
   }
+
+  if (!compareSeries[kind].length) {
+    destroyChart(config.chartKey);
+    document.getElementById(config.countId).textContent = "";
+    const table = config.getTable();
+    if (table) table.setData([]);
+    setVisible(config.chipsId, true);
+    setVisible(config.rangeLabelId, false);
+    setVisible(config.emptyId, true);
+    setVisible(config.chartBoxId, false);
+    setVisible(config.footerId, true);
+    setVisible(config.countId, false);
+    setVisible(config.tableVisibleId, false);
+    syncCompareMetricLock(kind);
+    renderCompareSeriesChips(kind);
+    populateCompareDateFilters(kind);
+    return;
+  }
+
+  document.getElementById(config.countId).textContent = "Loading comparison data…";
+  try {
+    await Promise.all(compareSeries[kind].map(series => fetchCampaignRowsForSeries(kind, series)));
+  } catch (err) {
+    if (requestId !== campaignRequestId[kind]) return;
+    console.error(err);
+    document.getElementById(config.countId).textContent = "Data unavailable: " + err.message;
+    return;
+  }
+  if (requestId !== campaignRequestId[kind]) return;
 
   const rows = getCompareRows(kind);
   const hasSeries = compareSeries[kind].length > 0;
@@ -1696,10 +1970,12 @@ function updateCampaignSection(kind) {
     if (table) {
       table.setColumns(WP_COLUMNS);
       table.setData(rows);
+      table.setLayout("fitColumns");
+      table.redraw(true);
     } else {
       config.setTable(new Tabulator(config.tableSelector, {
+        ...TABULATOR_TABLE_OPTS,
         data: rows,
-        layout: "fitColumns",
         pagination: true,
         paginationSize: 15,
         columns: WP_COLUMNS,
@@ -1749,43 +2025,525 @@ function getWeatherMetrics() {
   return getWeatherSource() === "daymet" ? WEATHER_METRICS_DAYMET : WEATHER_METRICS_ECCC;
 }
 
-function getActiveWeatherPIK() {
-  return getWeatherSource() === "daymet" ? weatherDaymetPIK : weatherEcccPIK;
+function getFilteredWeather() {
+  return getWeatherBaseRows();
 }
 
-function getActiveWeatherPIN() {
-  return getWeatherSource() === "daymet" ? weatherDaymetPIN : weatherEcccPIN;
+function hasWeatherData() { return hasSensorApi(); }
+function hasFluorescenceData() { return hasSensorApi(); }
+function hasReflectanceData() { return hasSensorApi(); }
+function hasWPData() { return hasSensorApi(); }
+function hasUavData() { return hasSensorApi(); }
+
+const UAV_METRICS = [
+  { field: "NDVI_mean", label: "NDVI (mean)" },
+  { field: "GNDVI_mean", label: "GNDVI (mean)" },
+  { field: "PRI_mean", label: "PRI (mean)" },
+  { field: "NDRE_mean", label: "NDRE (mean)" },
+  { field: "CCI_mean", label: "CCI (mean)" },
+  { field: "NIRv_mean", label: "NIRv (mean)" },
+  { field: "WaterIndex_mean", label: "Water index (mean)" },
+];
+
+function getUavSite() {
+  return document.getElementById("uav-site")?.value || "PIN";
 }
 
-function filterBySite(rows, siteField) {
-  const site = document.getElementById("site-filter").value;
-  return rows.filter(r => {
-    const s = (r[siteField] || "").toUpperCase();
-    if (site !== "all" && s !== site) return false;
-    return true;
+function uavYearFromDate(date) {
+  return parseInt(String(date).slice(0, 4), 10);
+}
+
+function getUavMetric() {
+  return document.getElementById("uav-metric")?.value || "NDVI_mean";
+}
+
+function getUavDateRange() {
+  return {
+    from: document.getElementById("uav-from-date")?.value || "",
+    to: document.getElementById("uav-to-date")?.value || "",
+  };
+}
+
+function isUavRangeMode() {
+  return uavDateMode === "range";
+}
+
+function getSelectedUavFlightDate() {
+  const year = document.getElementById("uav-flt-year")?.value || "";
+  const month = document.getElementById("uav-flt-month")?.value || "";
+  const day = document.getElementById("uav-flt-day")?.value || "";
+  if (!year || !month || !day) return "";
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function uavSeriesKey(series) {
+  return `${series.year}__${series.site}__${series.date}`;
+}
+
+function uavSeriesLabel(series) {
+  return `${series.site} · ${shortCompareDateLabel(series.date)}`;
+}
+
+function uavSeriesFullLabel(series) {
+  return `${series.site} · ${formatWeatherDisplay(series.date)}`;
+}
+
+function getAvailableUavCompareDates() {
+  const site = getUavSite();
+  const used = new Set(
+    uavCompareSeries.filter(s => s.site === site).map(s => s.date)
+  );
+  return (uavMeta?.flight_dates || []).filter(d => !used.has(d)).sort();
+}
+
+function updateUavDateModeUI() {
+  const active = activeSensor === "uav";
+  const isRange = isUavRangeMode();
+  setVisible("uav-filter-group", active && !isRange);
+  setVisible("uav-compare-actions", active && !isRange);
+  setVisible("uav-range-from", active && isRange);
+  setVisible("uav-range-to", active && isRange);
+}
+
+function syncUavCompareMetricLock() {
+  const locked = uavCompareSeries.length > 0;
+  const metricSel = document.getElementById("uav-metric");
+  const clearBtn = document.getElementById("uav-clear-series");
+  const addBtn = document.getElementById("uav-add-series");
+  if (metricSel) metricSel.disabled = locked;
+  if (clearBtn) clearBtn.disabled = !locked;
+  if (addBtn) addBtn.disabled = locked
+    ? uavCompareSeries.length >= COMPARE_MAX_SERIES
+    : !getAvailableUavCompareDates().length;
+}
+
+function renderUavCompareSeriesChips() {
+  const wrap = document.getElementById("uav-series-chips");
+  if (!wrap) return;
+  wrap.innerHTML = uavCompareSeries.map((series, i) => `
+    <span class="series-chip" style="border-color:${COMPARE_COLORS[i % COMPARE_COLORS.length]}">
+      ${uavSeriesFullLabel(series)}
+      <button type="button" data-remove="${uavSeriesKey(series)}" aria-label="Remove ${uavSeriesFullLabel(series)}">×</button>
+    </span>
+  `).join("");
+  wrap.querySelectorAll("button[data-remove]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const key = btn.dataset.remove;
+      uavCompareSeries = uavCompareSeries.filter(s => uavSeriesKey(s) !== key);
+      uavSeriesRowCache.delete(key);
+      updateUavSection();
+    });
   });
 }
 
-function getFilteredWeather() {
-  return [...filterBySite(getActiveWeatherPIK(), "site_id"), ...filterBySite(getActiveWeatherPIN(), "site_id")];
+async function fetchUavRowsForSeries(series) {
+  const key = uavSeriesKey(series);
+  if (uavSeriesRowCache.has(key)) return uavSeriesRowCache.get(key);
+  const payload = await queryJson(buildUavQuery("/uav/rows", {
+    site: series.site,
+    from: series.date,
+    to: series.date,
+    all: "true",
+  }));
+  const rows = payload.rows || [];
+  uavSeriesRowCache.set(key, rows);
+  return rows;
 }
 
-function getFilteredFluorescence() {
-  return filterBySite(fluorescence, "site");
+async function addUavCompareSeries() {
+  const date = getSelectedUavFlightDate();
+  if (!date) return;
+  const next = { year: uavYearFromDate(date), site: getUavSite(), date };
+  if (uavCompareSeries.some(s => uavSeriesKey(s) === uavSeriesKey(next))) return;
+  if (uavCompareSeries.length >= COMPARE_MAX_SERIES) return;
+  document.getElementById("uav-count").textContent = "Loading flight data…";
+  await fetchUavRowsForSeries(next);
+  uavCompareSeries = [...uavCompareSeries, next];
+  await updateUavSection();
 }
 
-function getFilteredReflectance() {
-  return filterBySite(reflectance, "site");
+function clearUavCompareSeries() {
+  uavCompareSeries = [];
+  uavSeriesRowCache.clear();
+  updateUavSection();
 }
 
-function getFilteredWP() {
-  return predawnWP;
+function getUavCompareRows() {
+  if (!uavCompareSeries.length) return [];
+  return uavCompareSeries.flatMap(series => uavSeriesRowCache.get(uavSeriesKey(series)) || []);
 }
 
-function hasWeatherData() { return getFilteredWeather().length > 0; }
-function hasFluorescenceData() { return fluorescence.length > 0; }
-function hasReflectanceData() { return reflectance.length > 0; }
-function hasWPData() { return predawnWP.length > 0; }
+function formatUavCompareCount(count) {
+  if (!uavCompareSeries.length) return "";
+  const parts = uavCompareSeries.map(s => uavSeriesLabel(s));
+  return `${count.toLocaleString()} UAV row${count === 1 ? "" : "s"} · ${parts.join(" · ")}`;
+}
+
+function getUavChartMetric() {
+  const field = getUavMetric();
+  return UAV_METRICS.find(m => m.field === field) || UAV_METRICS[0];
+}
+
+function buildUavCompareChartGroups(metric) {
+  return uavCompareSeries.map((series, index) => {
+    const rows = uavSeriesRowCache.get(uavSeriesKey(series)) || [];
+    const points = rows.map((row, pointIndex) => ({
+      y: parseMetricValue(row[metric.field]),
+      label: row.site_treeid || `tree ${pointIndex + 1}`,
+    })).filter(point => point.y != null);
+    const stats = computeBoxStats(points.map(point => point.y));
+    if (!stats || !points.length) return null;
+    return {
+      metric: {
+        field: metric.field,
+        label: uavSeriesLabel(series),
+        color: COMPARE_COLORS[index % COMPARE_COLORS.length],
+        decimals: 4,
+      },
+      groupIndex: index,
+      stats,
+      points,
+    };
+  }).filter(Boolean).map((group, index) => ({ ...group, groupIndex: index }));
+}
+
+function updateUavCompareChart() {
+  destroyChart("uav");
+  if (!uavCompareSeries.length) return false;
+  const metric = getUavChartMetric();
+  const groups = buildUavCompareChartGroups(metric);
+  if (!groups.length) return false;
+  const titleEl = document.getElementById("uav-chart-title");
+  if (titleEl) {
+    titleEl.textContent = groups.length === 1
+      ? `${metric.label} — ${uavSeriesFullLabel(uavCompareSeries[0])}`
+      : `${metric.label} — ${groups.length} series (sites / dates)`;
+  }
+  const ctx = document.getElementById("uav-chart");
+  charts.uav = buildScatterBoxChartFromGroups(ctx, groups, {
+    xTitle: "Site · date",
+    yTitle: metric.label,
+  });
+  return true;
+}
+
+async function loadUavMeta(force = false) {
+  if (!QUERY_BASE) return null;
+  const site = getUavSite();
+  if (!force && uavMeta && uavMetaSite === site) return uavMeta;
+  uavMeta = await queryJson(buildUavQuery("/uav/meta", { site }));
+  uavMetaSite = site;
+  return uavMeta;
+}
+
+function populateUavFlightDateFilters({ reset = false, cascadeFrom = null } = {}) {
+  const yearSel = document.getElementById("uav-flt-year");
+  const monthSel = document.getElementById("uav-flt-month");
+  const daySel = document.getElementById("uav-flt-day");
+  const addBtn = document.getElementById("uav-add-series");
+  if (!yearSel || !monthSel || !daySel) return;
+
+  const dates = isUavRangeMode()
+    ? (uavMeta?.flight_dates || []).slice().sort()
+    : getAvailableUavCompareDates();
+  const prevYear = reset ? "" : yearSel.value;
+  const prevMonth = reset || cascadeFrom === "year" ? "" : monthSel.value;
+  const prevDay = reset || cascadeFrom === "year" || cascadeFrom === "month" ? "" : daySel.value;
+
+  const years = [...new Set(dates.map(d => d.slice(0, 4)))].sort();
+  yearSel.innerHTML = years.length
+    ? years.map(y => `<option value="${y}">${y}</option>`).join("")
+    : '<option value="">No years</option>';
+  if (!years.length) {
+    monthSel.innerHTML = '<option value="">Month</option>';
+    daySel.innerHTML = '<option value="">Day</option>';
+    if (addBtn) addBtn.disabled = true;
+    return;
+  }
+  yearSel.value = prevYear && years.includes(prevYear) ? prevYear : years[years.length - 1];
+
+  const year = yearSel.value;
+  const months = [...new Set(
+    dates.filter(d => d.startsWith(`${year}-`)).map(d => parseInt(d.slice(5, 7), 10))
+  )].sort((a, b) => a - b);
+  monthSel.innerHTML = months.length
+    ? months.map(m => `<option value="${m}">${MONTH_NAMES[m]}</option>`).join("")
+    : '<option value="">No months</option>';
+  if (!months.length) {
+    daySel.innerHTML = '<option value="">Day</option>';
+    if (addBtn) addBtn.disabled = true;
+    return;
+  }
+  const monthNum = prevMonth && months.includes(parseInt(prevMonth, 10))
+    ? parseInt(prevMonth, 10)
+    : months[months.length - 1];
+  monthSel.value = String(monthNum);
+
+  const monthStr = String(monthNum).padStart(2, "0");
+  const days = dates
+    .filter(d => d.startsWith(`${year}-${monthStr}-`))
+    .map(d => parseInt(d.slice(8, 10), 10))
+    .sort((a, b) => a - b);
+  daySel.innerHTML = days.length
+    ? days.map(d => `<option value="${d}">${d}</option>`).join("")
+    : '<option value="">Day</option>';
+  if (!days.length) {
+    if (addBtn) addBtn.disabled = true;
+    return;
+  }
+  const dayNum = prevDay && days.includes(parseInt(prevDay, 10))
+    ? parseInt(prevDay, 10)
+    : days[days.length - 1];
+  daySel.value = String(dayNum);
+  if (addBtn) addBtn.disabled = uavCompareSeries.length >= COMPARE_MAX_SERIES;
+}
+
+function syncUavDateInputs(reset = false) {
+  const fromInput = document.getElementById("uav-from-date");
+  const toInput = document.getElementById("uav-to-date");
+  const bounds = uavMeta?.bounds;
+  if (!bounds?.min_date || !fromInput || !toInput) {
+    [fromInput, toInput].forEach(el => { if (el) { el.min = ""; el.max = ""; el.value = ""; } });
+    return;
+  }
+  const first = String(bounds.min_date).slice(0, 10);
+  const last = String(bounds.max_date).slice(0, 10);
+  [fromInput, toInput].forEach(el => { if (el) { el.min = first; el.max = last; } });
+  if (reset || !fromInput.value || fromInput.value < first || fromInput.value > last) {
+    fromInput.value = first;
+  }
+  if (reset || !toInput.value || toInput.value < first || toInput.value > last) {
+    toInput.value = last;
+  }
+}
+
+function populateUavMetricFilter() {
+  populateMetricFilter("uav-metric", UAV_METRICS, "NDVI_mean");
+}
+
+async function updateUavChart() {
+  destroyChart("uav");
+  if (!QUERY_BASE || !isUavRangeMode()) return false;
+  const { from, to } = getUavDateRange();
+  const payload = await queryJson(buildUavQuery("/uav/daily", {
+    metric: getUavMetric(),
+    site: getUavSite(),
+    from,
+    to,
+  }));
+  const points = payload.points || [];
+  if (!points.length) return false;
+  const metricLabel = UAV_METRICS.find(m => m.field === payload.metric)?.label || payload.metric;
+  document.getElementById("uav-chart-title").textContent =
+    `UAV ${getUavSite()} — ${metricLabel}`;
+  const ctx = document.getElementById("uav-chart");
+  charts.uav = new Chart(ctx, {
+    type: "line",
+    data: {
+      datasets: [{
+        label: metricLabel,
+        data: points.map(p => ({ x: p.date, y: p.mean })),
+        borderColor: "#336633",
+        backgroundColor: "rgba(51,102,51,0.1)",
+        tension: 0.2,
+        pointRadius: 2,
+        borderWidth: 1.5,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { type: "category", title: { display: true, text: "Flight date" } },
+        y: { title: { display: true, text: metricLabel } },
+      },
+    },
+  });
+  return true;
+}
+
+function getUavTableColumns() {
+  return [
+    { title: "Site", field: "site", width: 70 },
+    { title: "Year", field: "year", width: 70 },
+    { title: "Flight date", field: "flight_date", minWidth: 110 },
+    { title: "Tree ID", field: "site_treeid", minWidth: 100 },
+    { title: "Confidence", field: "confidence", formatter: numFmt, minWidth: 90 },
+    { title: "NDVI", field: "NDVI_mean", formatter: numFmt },
+    { title: "GNDVI", field: "GNDVI_mean", formatter: numFmt },
+    { title: "PRI", field: "PRI_mean", formatter: numFmt },
+    { title: "NDRE", field: "NDRE_mean", formatter: numFmt },
+    { title: "CCI", field: "CCI_mean", formatter: numFmt },
+    { title: "NIRv", field: "NIRv_mean", formatter: numFmt },
+    { title: "Water index", field: "WaterIndex_mean", formatter: numFmt },
+  ];
+}
+
+function updateUavCountLabel() {
+  const { from, to } = getUavDateRange();
+  const uniqueDates = [...new Set(uavTableRows.map(r => r.flight_date).filter(Boolean))].sort();
+  document.getElementById("uav-range-label").textContent = uniqueDates.length
+    ? `${uniqueDates.length} flight dates · ${uniqueDates[0]} to ${uniqueDates[uniqueDates.length - 1]}`
+    : (from && to ? `${from} to ${to}` : "");
+  const trees = new Set(uavTableRows.map(r => r.site_treeid).filter(Boolean)).size;
+  document.getElementById("uav-count").textContent =
+    `${uavTableTotal.toLocaleString()} row${uavTableTotal === 1 ? "" : "s"} · ${trees.toLocaleString()} trees · ${uniqueDates.length} flight date${uniqueDates.length === 1 ? "" : "s"}`;
+}
+
+function refreshUavTable() {
+  const columns = getUavTableColumns();
+  if (uavTable) {
+    uavTable.setColumns(columns);
+    uavTable.setData(uavTableRows);
+    uavTable.setLayout("fitColumns");
+    uavTable.redraw(true);
+    return uavTable;
+  }
+  uavTable = new Tabulator("#uav-table", {
+    ...TABULATOR_TABLE_OPTS,
+    data: uavTableRows,
+    pagination: true,
+    paginationSize: 25,
+    columns,
+  });
+  return uavTable;
+}
+
+async function fetchAllUavRows() {
+  if (!QUERY_BASE) return [];
+  const { from, to } = getUavDateRange();
+  const params = {
+    site: getUavSite(),
+    all: "true",
+  };
+  if (from) params.from = from;
+  if (to) params.to = to;
+  const payload = await queryJson(buildUavQuery("/uav/rows", params));
+  uavTableRows = payload.rows || [];
+  uavTableTotal = payload.total ?? uavTableRows.length;
+  return uavTableRows;
+}
+
+async function updateUavRangeSection(requestId) {
+  await loadUavMeta();
+  if (requestId !== uavRequestId) return;
+  const site = getUavSite();
+  const siteChanged = lastUavSite !== site;
+  syncUavDateInputs(siteChanged);
+  lastUavSite = site;
+  const hasChart = await updateUavChart();
+  if (requestId !== uavRequestId) return;
+  setVisible("uav-series-chips", false);
+  setVisible("uav-compare-empty", false);
+  setVisible("uav-table", true);
+  setVisible("uav-table-footer", true);
+  document.getElementById("uav-count").textContent = "Loading all rows in selection…";
+  await fetchAllUavRows();
+  if (requestId !== uavRequestId) return;
+  refreshUavTable();
+  const hasRows = uavTableTotal > 0;
+  setVisible("uav-chart-box", hasChart);
+  setVisible("uav-range-label", true);
+  updateUavCountLabel();
+}
+
+async function updateUavCompareSection(requestId) {
+  await loadUavMeta();
+  if (requestId !== uavRequestId) return;
+  const site = getUavSite();
+  const siteChanged = lastUavSite !== site;
+  lastUavSite = site;
+  populateUavFlightDateFilters({ reset: siteChanged });
+  syncUavCompareMetricLock();
+  renderUavCompareSeriesChips();
+
+  const hasSeries = uavCompareSeries.length > 0;
+  setVisible("uav-series-chips", true);
+  setVisible("uav-compare-empty", !hasSeries);
+  setVisible("uav-range-label", false);
+  setVisible("uav-table-footer", true);
+
+  if (!hasSeries) {
+    destroyChart("uav");
+    setVisible("uav-chart-box", false);
+    setVisible("uav-count", false);
+    setVisible("uav-table", false);
+    document.getElementById("uav-count").textContent = "";
+    if (uavTable) uavTable.setData([]);
+    return;
+  }
+
+  document.getElementById("uav-count").textContent = "Loading comparison data…";
+  await Promise.all(uavCompareSeries.map(series => fetchUavRowsForSeries(series)));
+  if (requestId !== uavRequestId) return;
+
+  const rows = getUavCompareRows();
+  const hasRows = rows.length > 0;
+  uavTableRows = rows;
+  uavTableTotal = rows.length;
+  setVisible("uav-count", hasRows);
+  setVisible("uav-table", hasRows);
+  setVisible("uav-chart-box", hasRows);
+  document.getElementById("uav-count").textContent = formatUavCompareCount(rows.length);
+  updateUavCompareChart();
+  uavTable = initMetricSubsetTable(uavTable, "#uav-table", getUavTableColumns, getUavCompareRows);
+}
+
+async function updateUavSection() {
+  await ensureApiMode();
+  if (!QUERY_BASE) {
+    document.getElementById("uav-count").textContent = "UAV data requires the FastAPI backend (port 8000 or ?api).";
+    setVisible("uav-chart-box", false);
+    setVisible("uav-range-label", false);
+    setVisible("uav-series-chips", false);
+    setVisible("uav-compare-empty", false);
+    setVisible("uav-table", false);
+    setVisible("uav-table-footer", false);
+    return;
+  }
+  const requestId = ++uavRequestId;
+  document.getElementById("uav-count").textContent = "Loading UAV data…";
+  setVisible("uav-count", true);
+  try {
+    if (isUavRangeMode()) {
+      await updateUavRangeSection(requestId);
+    } else {
+      await updateUavCompareSection(requestId);
+    }
+  } catch (err) {
+    if (requestId !== uavRequestId) return;
+    console.error(err);
+    destroyChart("uav");
+    document.getElementById("uav-count").textContent = "UAV data unavailable: " + err.message;
+    setVisible("uav-chart-box", false);
+    setVisible("uav-range-label", false);
+    setVisible("uav-series-chips", false);
+    setVisible("uav-compare-empty", false);
+    setVisible("uav-table", false);
+    setVisible("uav-table-footer", false);
+  }
+}
+
+function downloadUavCsv() {
+  if (!uavTable) return;
+  if (isUavRangeMode()) {
+    const { from, to } = getUavDateRange();
+    const range = from && to ? (from === to ? `_${from}` : `_${from}_to_${to}`) : "";
+    uavTable.download("csv", `uav_${getUavSite()}${range}.csv`);
+    return;
+  }
+  const parts = uavCompareSeries.map(s => `${s.year}_${s.site}_${s.date}`);
+  uavTable.download("csv", `uav_compare_${parts.join("__")}.csv`);
+}
+
+function downloadUavFullCsv() {
+  Promise.all([2022, 2023].map(year =>
+    downloadSourceCsvFile(`uav_reflectance_${year}.csv`)
+  )).catch(err => {
+    console.error(err);
+    alert("Could not download full UAV dataset.");
+  });
+}
 
 function setVisible(id, visible) {
   const el = document.getElementById(id);
@@ -1904,21 +2662,17 @@ function showSensor(sensorId) {
     `${ERD_DOMAINS[meta.domain].title} · ${meta.title}`;
   renderDomainTabs();
   renderEntityTabs();
-  if (sensorId === "fluorescence") {
-    populateFluorescenceMetricFilter();
-    populateCompareDateFilters("fluor", { reset: true });
-    if (isCampaignRangeMode("fluor")) syncCampaignDateInputs("fluor", true);
-  }
-  if (sensorId === "reflectance") {
-    populateReflectanceMetricFilter();
-    populateCompareDateFilters("refl", { reset: true });
-    if (isCampaignRangeMode("refl")) syncCampaignDateInputs("refl", true);
-  }
-  if (sensorId === "wp") {
-    populateCompareDateFilters("wp", { reset: true });
-    if (isCampaignRangeMode("wp")) syncCampaignDateInputs("wp", true);
-  }
-  refreshAll();
+  updateVisibility();
+  (async () => {
+    const apiOk = await ensureApiMode();
+    if (!apiOk) {
+      refreshAll();
+      return;
+    }
+    await ensureSensorReady(sensorId);
+    loadSensorMetadata(sensorId);
+    await refreshAll();
+  })();
 }
 
 function showEntity(domainId, entityId) {
@@ -1928,7 +2682,7 @@ function showEntity(domainId, entityId) {
   else showBlankEntity(domainId, entity);
 }
 
-function initViewFromHash() {
+async function initViewFromHash() {
   const hash = location.hash.replace(/^#/, "");
   if (!hash) {
     showHome();
@@ -1953,18 +2707,30 @@ function updateVisibility() {
   const hasWeather = activeSensor === "weather" && hasWeatherData();
   const hasFluor = activeSensor === "fluorescence" && hasFluorescenceData();
   const hasRefl = activeSensor === "reflectance" && hasReflectanceData();
-  const hasWP = activeSensor === "wp" && (hasWPData() || predawnWP.length > 0);
+  const hasWP = activeSensor === "wp" && hasWPData();
+  const hasUav = activeSensor === "uav" && hasUavData();
 
-  setVisible("data-records-block", !blank && activeSensor !== "wp");
+  setVisible("data-records-block", !blank && activeSensor !== "wp" && activeSensor !== "uav");
   setVisible("sensor-controls", !blank);
   setVisible("weather-section", hasWeather);
   setVisible("fluorescence-section", hasFluor);
   setVisible("reflectance-section", hasRefl);
   setVisible("wp-section", hasWP);
+  setVisible("uav-section", hasUav || activeSensor === "uav");
 
   setVisible("weather-controls-view", activeSensor === "weather");
   setVisible("weather-source-control", activeSensor === "weather");
   setVisible("weather-metric-control", activeSensor === "weather" && weatherDateMode !== "single");
+  setVisible("uav-site-control", activeSensor === "uav");
+  setVisible("uav-metric-control", activeSensor === "uav");
+  setVisible("uav-date-mode-control", activeSensor === "uav");
+  if (activeSensor === "uav") updateUavDateModeUI();
+  else {
+    setVisible("uav-filter-group", false);
+    setVisible("uav-compare-actions", false);
+    setVisible("uav-range-from", false);
+    setVisible("uav-range-to", false);
+  }
   document.getElementById("sensor-controls").classList.toggle("weather-active", activeSensor === "weather");
   if (activeSensor === "weather") updateWeatherDateModeUI();
   ["fluor", "refl", "wp"].forEach(kind => {
@@ -2004,11 +2770,27 @@ function getWPRows() {
   return getCompareRows("wp");
 }
 
-function updateWeatherSection() {
-  syncWeatherDateInputs();
+async function updateWeatherSection() {
+  if (!QUERY_BASE) {
+    document.getElementById("weather-count").textContent = "Weather data requires the FastAPI backend (port 8000 or ?api).";
+    return;
+  }
+  const requestId = ++weatherRequestId;
+  try {
+    await loadWeatherMeta();
+    syncWeatherDateInputs();
+    await fetchWeatherRows();
+  } catch (err) {
+    if (requestId !== weatherRequestId) return;
+    console.error(err);
+    document.getElementById("weather-count").textContent = "Weather data unavailable: " + err.message;
+    return;
+  }
+  if (requestId !== weatherRequestId) return;
+  populateWeatherMetricFilter();
   const isSingle = weatherDateMode === "single";
   const rows = getWeatherRows();
-  const hasData = hasWeatherData();
+  const hasData = hasWeatherData() && rows.length > 0;
   setVisible("weather-single-view", isSingle && hasData);
   setVisible("weather-chart-box", !isSingle && hasData && rows.length > 0);
   setVisible("weather-range-label", !isSingle && hasData);
@@ -2033,15 +2815,15 @@ function updateWeatherSection() {
 }
 
 function updateFluorescenceSection() {
-  updateCampaignSection("fluor");
+  return updateCampaignSection("fluor");
 }
 
 function updateReflectanceSection() {
-  updateCampaignSection("refl");
+  return updateCampaignSection("refl");
 }
 
 function updateWPSection() {
-  updateCampaignSection("wp");
+  return updateCampaignSection("wp");
 }
 
 function initWeatherTable(columns, getRows) {
@@ -2049,11 +2831,13 @@ function initWeatherTable(columns, getRows) {
   if (weatherTable) {
     weatherTable.setColumns(columns);
     weatherTable.setData(rows);
+    weatherTable.setLayout("fitColumns");
+    weatherTable.redraw(true);
     return weatherTable;
   }
   return new Tabulator("#weather-table", {
+    ...TABULATOR_TABLE_OPTS,
     data: rows,
-    layout: "fitData",
     pagination: true,
     paginationSize: 15,
     columns,
@@ -2140,14 +2924,22 @@ async function downloadSourceCsvFile(filename) {
   triggerCsvDownload(await response.text(), filename);
 }
 
-function downloadWeatherFullCsv() {
-  const rows = getWeatherBaseRows();
-  if (!rows.length) return;
-  const fields = getWeatherTableColumns().map(col => col.field);
-  const site = document.getElementById("site-filter").value;
+async function downloadWeatherFullCsv() {
   const source = getWeatherSource();
-  const sitePart = site === "all" ? "all_sites" : site;
-  downloadRowsAsCsv(rows, fields, `weather_${source}_${sitePart}_full.csv`);
+  const siteFilter = document.getElementById("site-filter")?.value || "all";
+  const params = { source, all: "true" };
+  if (siteFilter !== "all") params.site = siteFilter;
+  try {
+    const payload = await queryJson(buildQuery("/weather/rows", params));
+    const rows = payload.rows || [];
+    if (!rows.length) return;
+    const fields = getWeatherTableColumns().map(col => col.field);
+    const sitePart = siteFilter === "all" ? "all_sites" : siteFilter;
+    downloadRowsAsCsv(rows, fields, `weather_${source}_${sitePart}_full.csv`);
+  } catch (err) {
+    console.error(err);
+    alert("Could not download full weather dataset.");
+  }
 }
 
 function downloadFluorescenceFullCsv() {
@@ -2177,11 +2969,13 @@ function initMetricSubsetTable(tableVar, selector, getColumns, getRows) {
   if (tableVar) {
     tableVar.setColumns(columns);
     tableVar.setData(rows);
+    tableVar.setLayout("fitColumns");
+    tableVar.redraw(true);
     return tableVar;
   }
   return new Tabulator(selector, {
+    ...TABULATOR_TABLE_OPTS,
     data: rows,
-    layout: "fitData",
     pagination: true,
     paginationSize: 15,
     columns,
@@ -2691,12 +3485,14 @@ function updateWPCompareChart() {
   });
 }
 
-function refreshAll() {
+async function refreshAll() {
   updateVisibility();
-  updateWeatherSection();
-  updateFluorescenceSection();
-  updateReflectanceSection();
-  updateWPSection();
+  if (!QUERY_BASE) return;
+  if (activeSensor === "weather") await updateWeatherSection();
+  if (activeSensor === "fluorescence") await updateFluorescenceSection();
+  if (activeSensor === "reflectance") await updateReflectanceSection();
+  if (activeSensor === "wp") await updateWPSection();
+  if (activeSensor === "uav") await updateUavSection();
 }
 
 function populateMetricFilter(selectId, metrics, defaultField, allowAll = false) {
@@ -2733,6 +3529,8 @@ function loadWeatherMetadata() {
 }
 
 function onWeatherSourceChange() {
+  weatherMeta = null;
+  weatherMetaKey = "";
   populateWeatherMetricFilter();
   loadWeatherMetadata();
   syncWeatherDateInputs(true);
@@ -2758,69 +3556,21 @@ function populateReflectanceMetricFilter() {
   syncCompareMetricLock("refl");
 }
 
-function loadMetadataPanels() {
-  const panels = [
-    { id: "fluorescence-metadata", path: "fluorescence_pin_2023.md" },
-    { id: "reflectance-metadata", path: "reflectance_pin_2023.md" },
-    { id: "wp-metadata", path: "predawn_wp_pin_2023.md" },
-  ];
-  loadWeatherMetadata();
-  return Promise.all(panels.map(p =>
-    loadMarkdown(DATA_BASE + p.path)
-      .then(md => {
-        let content = md;
-        if (p.path === "reflectance_pin_2023.md") content = stripReflectanceBoilerplate(md);
-        document.getElementById(p.id).innerHTML = renderMarkdown(content);
-        document.getElementById(p.id).classList.remove("loading");
-      })
-      .catch(err => { document.getElementById(p.id).textContent = "Metadata unavailable: " + err.message; document.getElementById(p.id).classList.remove("loading"); })
-  ));
+async function bootDashboard() {
+  await ensureApiMode();
+  renderHomeDomainCards();
+  dashboardReady = true;
+  const hash = location.hash.replace(/^#/, "");
+  if (hash) await initViewFromHash();
+  else showHome();
 }
 
-ensureAuth().then(me => {
-  if (me?.email) {
-    const bar = document.getElementById("auth-user-bar");
-    if (bar) {
-      bar.style.display = "flex";
-      document.getElementById("auth-user-email").textContent = `Signed in as ${me.email}`;
-    }
-  }
-  return Promise.all([
-    loadCSV(DATA_BASE + "PIK_daily_2010-2024.csv"),
-    loadCSV(DATA_BASE + "PIN_daily_2010-2024.csv"),
-    loadCSV(DATA_BASE + "PIK_daymet_daily_2010-2024.csv"),
-    loadCSV(DATA_BASE + "PIN_daymet_daily_2010-2024.csv"),
-    loadCSV(DATA_BASE + "reflectance_indices.csv", true),
-    loadCSV(DATA_BASE + "fluorescence_indices.csv", true),
-    loadCSV(DATA_BASE + "predawn_wp_2023.csv"),
-  ]);
-}).then(([pik, pin, daymetPik, daymetPin, reflPack, fluorPack, wp]) => {
-  weatherEcccPIK = pik;
-  weatherEcccPIN = pin;
-  weatherDaymetPIK = daymetPik;
-  weatherDaymetPIN = daymetPin;
-  reflectance = reflPack.data;
-  reflectanceFieldOrder = reflPack.fields;
-  fluorescence = fluorPack.data;
-  fluorescenceFieldOrder = fluorPack.fields;
-  predawnWP = wp;
-  populateWeatherMetricFilter();
-  populateFluorescenceMetricFilter();
-  populateReflectanceMetricFilter();
-  COMPARE_KINDS.forEach(kind => populateCompareDateFilters(kind, { reset: true }));
-  syncWeatherDateInputs(true);
-  loadMetadataPanels();
-  initViewFromHash();
-  if (activeSensor) refreshAll();
-}).catch(err => {
-  console.error(err);
-});
+Promise.resolve().then(bootDashboard).catch(err => console.error(err));
 
 document.getElementById("site-filter").addEventListener("change", () => {
-  if (activeSensor === "weather") {
-    syncWeatherDateInputs(true);
-    populateWeatherMetricFilter();
-  }
+  weatherMeta = null;
+  weatherMetaKey = "";
+  if (activeSensor === "weather") syncWeatherDateInputs(true);
   refreshAll();
 });
 document.getElementById("weather-source").addEventListener("change", onWeatherSourceChange);
@@ -2891,6 +3641,9 @@ COMPARE_KINDS.forEach(kind => {
   const siteEl = document.getElementById(`${kind}-site`);
   if (siteEl) {
     siteEl.addEventListener("change", () => {
+      campaignMeta[kind] = null;
+      campaignMetaKey[kind] = "";
+      campaignRowCache.clear();
       if (isCampaignRangeMode(kind)) {
         syncCampaignDateInputs(kind, true);
         sectionRefresh();
@@ -2910,6 +3663,44 @@ COMPARE_KINDS.forEach(kind => {
 });
 document.getElementById("wp-download-csv").addEventListener("click", downloadWPCsv);
 document.getElementById("wp-download-full-csv").addEventListener("click", downloadWPFullCsv);
+document.getElementById("uav-mode-toggle")?.addEventListener("click", e => {
+  const btn = e.target.closest("button[data-mode]");
+  if (!btn) return;
+  uavDateMode = btn.dataset.mode;
+  document.querySelectorAll("#uav-mode-toggle button").forEach(b => b.classList.toggle("active", b === btn));
+  updateUavDateModeUI();
+  if (isUavRangeMode()) syncUavDateInputs(true);
+  if (activeSensor === "uav") updateUavSection();
+});
+document.getElementById("uav-add-series")?.addEventListener("click", () => addUavCompareSeries());
+document.getElementById("uav-clear-series")?.addEventListener("click", () => clearUavCompareSeries());
+document.getElementById("uav-site")?.addEventListener("change", () => {
+  if (activeSensor !== "uav") return;
+  uavMeta = null;
+  uavMetaSite = null;
+  if (isUavRangeMode()) syncUavDateInputs(true);
+  updateUavSection();
+});
+["uav-metric", "uav-from-date", "uav-to-date"].forEach(id => {
+  document.getElementById(id)?.addEventListener("change", () => {
+    if (activeSensor !== "uav") return;
+    if (!isUavRangeMode() && id === "uav-metric" && uavCompareSeries.length) {
+      updateUavCompareChart();
+      return;
+    }
+    updateUavSection();
+  });
+});
+["uav-flt-year", "uav-flt-month", "uav-flt-day"].forEach(id => {
+  document.getElementById(id)?.addEventListener("change", () => {
+    if (activeSensor !== "uav" || isUavRangeMode()) return;
+    if (id === "uav-flt-year") populateUavFlightDateFilters({ cascadeFrom: "year" });
+    else if (id === "uav-flt-month") populateUavFlightDateFilters({ cascadeFrom: "month" });
+    syncUavCompareMetricLock();
+  });
+});
+document.getElementById("uav-download-csv")?.addEventListener("click", downloadUavCsv);
+document.getElementById("uav-download-full-csv")?.addEventListener("click", downloadUavFullCsv);
 
 document.getElementById("back-to-home").addEventListener("click", e => {
   e.preventDefault();
