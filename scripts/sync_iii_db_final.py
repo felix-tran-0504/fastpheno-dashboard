@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sync III_db_final from ffgg-fastpheno2 via SSH/SFTP into local staging."""
+"""Sync selected III_db_final folders from ffgg-fastpheno2 via SSH/SFTP."""
 
 from __future__ import annotations
 
@@ -8,7 +8,14 @@ import stat
 import sys
 from pathlib import Path
 
-from fastpheno_env import get_iii_db_root, get_remote_config, load_env, require_remote_config
+from fastpheno_env import (
+    DEFAULT_SYNC_FOLDERS,
+    get_iii_db_root,
+    get_remote_config,
+    get_sync_folders,
+    load_env,
+    require_remote_config,
+)
 
 load_env()
 
@@ -55,7 +62,8 @@ def list_remote(path: str | None = None, *, depth: int = 2) -> None:
     try:
         root = _resolve_remote_root(sftp, path or str(cfg["remote_path"]))
         print(f"Connected to {cfg['user']}@{cfg['host']}")
-        print(f"Remote root: {root}\n")
+        print(f"Remote root: {root}")
+        print(f"Configured sync folders: {', '.join(get_sync_folders())}\n")
         _walk_remote_listing(sftp, root, prefix="", depth=depth, max_depth=depth)
     finally:
         sftp.close()
@@ -77,7 +85,11 @@ def _walk_remote_listing(sftp, remote_dir: str, *, prefix: str, depth: int, max_
         full = sftp.normalize(f"{remote_dir}/{name}")
         kind = "dir" if stat.S_ISDIR(entry.st_mode) else "file"
         size = entry.st_size if kind == "file" else ""
-        print(f"{prefix}{name}/" if kind == "dir" else f"{prefix}{name}  ({size} bytes)")
+        if kind == "dir":
+            tag = " [sync]" if name in get_sync_folders() else " [skip]"
+            print(f"{prefix}{name}/{tag}")
+        else:
+            print(f"{prefix}{name}  ({size} bytes)")
         if kind == "dir" and depth < max_depth:
             _walk_remote_listing(
                 sftp, full, prefix=prefix + "  ", depth=depth + 1, max_depth=max_depth
@@ -119,7 +131,7 @@ def _download_tree(sftp, remote_dir: str, local_dir: Path, *, dry_run: bool) -> 
             skipped += 1
             continue
         if dry_run:
-            print(f"would download {remote_path} -> {local_path}")
+            print(f"  would download {remote_path} -> {local_path}")
             downloaded += 1
             continue
         local_path.parent.mkdir(parents=True, exist_ok=True)
@@ -128,9 +140,16 @@ def _download_tree(sftp, remote_dir: str, local_dir: Path, *, dry_run: bool) -> 
     return downloaded, skipped
 
 
-def sync(*, dry_run: bool = False, remote_path: str | None = None) -> Path:
+def sync(
+    *,
+    dry_run: bool = False,
+    remote_path: str | None = None,
+    folders: list[str] | None = None,
+    sync_all: bool = False,
+) -> Path:
     cfg = require_remote_config()
     local_root = get_iii_db_root()
+    folder_list = folders if folders is not None else get_sync_folders()
     client, sftp = _connect_sftp(cfg)
     try:
         remote_root = _resolve_remote_root(
@@ -147,12 +166,40 @@ def sync(*, dry_run: bool = False, remote_path: str | None = None) -> Path:
 
         print(f"Sync {cfg['user']}@{cfg['host']}:{remote_root}")
         print(f"  -> {local_root}")
+        if sync_all:
+            print("Mode: full tree")
+            targets = [("", remote_root, local_root)]
+        else:
+            print(f"Mode: selective ({len(folder_list)} folder(s))")
+            print(f"  {', '.join(folder_list)}")
+            targets = [
+                (name, sftp.normalize(f"{remote_root}/{name}"), local_root / name)
+                for name in folder_list
+            ]
         if dry_run:
             print("(dry run)")
-        downloaded, skipped = _download_tree(
-            sftp, remote_root, local_root, dry_run=dry_run
+
+        total_downloaded = 0
+        total_skipped = 0
+        for name, remote_sub, local_sub in targets:
+            label = name or "(root)"
+            try:
+                sftp.stat(remote_sub)
+            except OSError:
+                print(f"Warning: remote folder not found, skipping: {label}")
+                continue
+            print(f"\n[{label}]")
+            downloaded, skipped = _download_tree(
+                sftp, remote_sub, local_sub, dry_run=dry_run
+            )
+            total_downloaded += downloaded
+            total_skipped += skipped
+            print(f"  {downloaded} updated, {skipped} unchanged")
+
+        print(
+            f"\nDone: {total_downloaded} file(s) updated, "
+            f"{total_skipped} unchanged skipped"
         )
-        print(f"Done: {downloaded} file(s) updated, {skipped} unchanged skipped")
         return local_root
     finally:
         sftp.close()
@@ -161,16 +208,25 @@ def sync(*, dry_run: bool = False, remote_path: str | None = None) -> Path:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Sync III_db_final from ffgg-fastpheno2 via SSH/SFTP"
+        description="Sync selected FastPheno folders from ffgg-fastpheno2 via SSH/SFTP"
     )
     parser.add_argument(
         "--list-remote",
         action="store_true",
-        help="List remote III_db_final path (set FASTPHENO_REMOTE_III_DB_PATH if wrong)",
+        help="List remote root; folders marked for sync are noted",
     )
     parser.add_argument(
         "--remote-path",
         help="Override FASTPHENO_REMOTE_III_DB_PATH for this run",
+    )
+    parser.add_argument(
+        "--folders",
+        help="Comma-separated subfolders to sync (overrides FASTPHENO_SYNC_FOLDERS)",
+    )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Sync entire remote root (legacy full-tree behaviour)",
     )
     parser.add_argument(
         "--dry-run",
@@ -180,7 +236,8 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.list_remote:
-        list_remote(args.remote_path, depth=2)
+        list_remote(args.remote_path, depth=1)
+        print("\nDefault sync folders:", ", ".join(DEFAULT_SYNC_FOLDERS))
         return
 
     cfg = get_remote_config()
@@ -188,7 +245,16 @@ def main() -> None:
         print("Set FASTPHENO_REMOTE_HOST in backend/.env", file=sys.stderr)
         sys.exit(1)
 
-    sync(dry_run=args.dry_run, remote_path=args.remote_path)
+    folder_override = None
+    if args.folders:
+        folder_override = [f.strip() for f in args.folders.split(",") if f.strip()]
+
+    sync(
+        dry_run=args.dry_run,
+        remote_path=args.remote_path,
+        folders=folder_override,
+        sync_all=args.all,
+    )
 
 
 if __name__ == "__main__":

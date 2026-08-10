@@ -9,8 +9,20 @@ ROOT = Path(__file__).resolve().parents[1]
 ENV_FILE = ROOT / "backend" / ".env"
 DATA_DIR = ROOT / "data" / "fastpheno"
 
-_DEFAULT_LOCAL_III = Path.home() / "III_db_final_sync"
+_DEFAULT_LOCAL_III = Path.home() / "III_db_final_local"
 _FALLBACK_LOCAL_III = Path.home() / "Downloads" / "III_db_final"
+
+# Top-level folders under FASTPHENO_REMOTE_III_DB_PATH required by dashboard prep scripts.
+DEFAULT_SYNC_FOLDERS: tuple[str, ...] = (
+    "Weather",
+    "Fluorescence",
+    "Reflectance",
+    "UAV-Reflectance",
+    "UAV-SpatialInformation",
+    "SoilMoisture",
+    "PredawnWaterPotential",
+    "Pigments",
+)
 
 
 def load_env() -> None:
@@ -37,6 +49,18 @@ def get_iii_db_root() -> Path:
     if _FALLBACK_LOCAL_III.is_dir():
         return _FALLBACK_LOCAL_III
     return _DEFAULT_LOCAL_III
+
+
+def get_sync_folders() -> list[str]:
+    """
+    Remote subfolders to sync (comma-separated FASTPHENO_SYNC_FOLDERS in backend/.env).
+    Only these directories are downloaded — not the full server tree.
+    """
+    load_env()
+    raw = os.environ.get("FASTPHENO_SYNC_FOLDERS", "").strip()
+    if not raw:
+        return list(DEFAULT_SYNC_FOLDERS)
+    return [part.strip() for part in raw.split(",") if part.strip()]
 
 
 def get_remote_config() -> dict[str, str | int]:
@@ -69,6 +93,7 @@ def get_remote_config() -> dict[str, str | int]:
         "remote_path": remote_path,
         "ssh_key": key_path,
         "local_root": str(get_iii_db_root()),
+        "sync_folders": get_sync_folders(),
     }
 
 

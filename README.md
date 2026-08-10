@@ -140,7 +140,7 @@ python3 scripts/refresh_from_remote.py --skip-sync
 
 `refresh_from_remote.py` runs, in order: weather/fluorescence/reflectance prep, predawn WP, UAV reflectance, LiDAR/GNSS, soil moisture, then `build_parquet.py`. Individual steps warn and continue if a source folder is missing on the server.
 
-Local staging defaults to `~/III_db_final_sync` (`FASTPHENO_III_DB_ROOT`). Remote host: `ffgg-fastpheno2.utm.utoronto.ca`.
+Local staging defaults to `~/III_db_final_local` (`FASTPHENO_III_DB_ROOT`). Sync downloads only folders listed in `FASTPHENO_SYNC_FOLDERS` from `/data/FastPheno` on `ffgg-fastpheno2.utm.utoronto.ca` (use `sync_iii_db_final.py --all` for the full tree).
 
 Legacy manual path (if you already have a local tree):
 
