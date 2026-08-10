@@ -116,7 +116,7 @@ curl "http://localhost:8000/api/query/weather/rows?source=daymet&site=PIN&from=2
 | `PIK_daymet_daily_2010-2024.csv` / `PIN_daymet_daily_2010-2024.csv` | Daymet daily weather |
 | `fluorescence_indices.csv` | Combined fluorescence campaign rows |
 | `reflectance_indices.csv` | Combined reflectance index rows |
-| `predawn_wp_2023.csv` | Predawn water potential (2023) |
+| `predawn_wp_2023.csv` | Predawn water potential (from `PredawnWaterPotential/Process/SPC_PreWP_2023.csv`) |
 | `uav_reflectance_2022.csv` / `uav_reflectance_2023.csv` | UAV tree-level index metrics |
 | `*.md` | Sensor metadata shown in the dashboard |
 
@@ -135,9 +135,10 @@ python3 scripts/refresh_from_remote.py
 
 # Or step by step:
 python3 scripts/sync_iii_db_final.py
-python3 scripts/prepare_fastpheno_data.py
-python3 scripts/build_parquet.py
+python3 scripts/refresh_from_remote.py --skip-sync
 ```
+
+`refresh_from_remote.py` runs, in order: weather/fluorescence/reflectance prep, predawn WP, UAV reflectance, LiDAR/GNSS, soil moisture, then `build_parquet.py`. Individual steps warn and continue if a source folder is missing on the server.
 
 Local staging defaults to `~/III_db_final_sync` (`FASTPHENO_III_DB_ROOT`). Remote host: `ffgg-fastpheno2.utm.utoronto.ca`.
 

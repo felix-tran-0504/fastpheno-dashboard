@@ -24,6 +24,14 @@ def _run(cmd: list[str]) -> None:
     subprocess.run(cmd, cwd=ROOT, check=True)
 
 
+def _run_optional(cmd: list[str], label: str) -> None:
+    """Run a prep step; warn and continue if source folders are absent."""
+    print(f"\n>> {' '.join(cmd)}")
+    result = subprocess.run(cmd, cwd=ROOT)
+    if result.returncode != 0:
+        print(f"Warning: {label} step failed (exit {result.returncode}); continuing.")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Sync III_db_final from UofT host and refresh dashboard data"
@@ -70,6 +78,24 @@ def main() -> None:
     if args.weather_only:
         prep_cmd.append("--weather-only")
     _run(prep_cmd)
+
+    if not args.weather_only:
+        _run_optional(
+            [py, str(SCRIPTS / "prepare_predawn_wp.py")],
+            "Predawn water potential",
+        )
+        _run_optional(
+            [py, str(SCRIPTS / "consolidate_uav_reflectance.py"), "--no-parquet"],
+            "UAV reflectance",
+        )
+        _run_optional(
+            [py, str(SCRIPTS / "consolidate_uav_spatial.py"), "--no-parquet"],
+            "UAV LiDAR/GNSS",
+        )
+        _run_optional(
+            [py, str(SCRIPTS / "prepare_soil_moisture.py")],
+            "Soil moisture",
+        )
 
     if args.verify:
         verify_cmd = [py, str(SCRIPTS / "verify_fastpheno_data.py")]

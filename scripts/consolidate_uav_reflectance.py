@@ -139,6 +139,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--src", type=Path, default=None, help="uav-reflectance source folder")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT, help="output directory")
+    parser.add_argument("--no-parquet", action="store_true", help="skip Parquet rebuild")
     args = parser.parse_args()
 
     src = resolve_src(args.src)
@@ -152,6 +153,9 @@ def main() -> None:
         out_path = args.out / f"uav_reflectance_{year}.csv"
         rows, cols = write_year(by_year[year], out_path)
         print(f"  {year}: {len(by_year[year])} files -> {out_path.name} ({rows:,} rows, {cols} columns)")
+
+    if args.no_parquet:
+        return
 
     import sys
 
