@@ -8,8 +8,11 @@ import csv
 import sys
 from pathlib import Path
 
+from fastpheno_env import get_iii_db_root, load_env
+
+load_env()
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_SRC = Path("/Users/felixtran/Downloads/III_db_final/SoilMoisture")
+DEFAULT_SRC = get_iii_db_root() / "SoilMoisture"
 OUT = ROOT / "data" / "fastpheno" / "soil_moisture.csv"
 
 SITE_MAP = {

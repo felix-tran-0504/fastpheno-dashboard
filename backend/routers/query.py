@@ -28,11 +28,12 @@ def list_datasets():
 def domain_meta(
     domain: str,
     source: str | None = Query(None, description="Weather source: eccc or daymet"),
+    resolution: str | None = Query(None, description="Weather resolution: daily or hourly (ECCC only)"),
     site: str | None = Query(None, description="PIK or PIN"),
     year: int | None = Query(None, description="UAV year (2022 or 2023)"),
 ):
     try:
-        return query_engine.get_domain_meta(domain, source=source, site=site, year=year)
+        return query_engine.get_domain_meta(domain, source=source, resolution=resolution, site=site, year=year)
     except Exception as exc:
         raise _http_error(exc) from exc
 
@@ -42,6 +43,7 @@ def domain_daily(
     domain: str,
     metric: str = Query(..., description="Metric column to aggregate or plot"),
     source: str | None = Query(None, description="Weather source: eccc or daymet"),
+    resolution: str | None = Query(None, description="Weather resolution: daily or hourly (ECCC only)"),
     site: str | None = Query(None, description="PIK or PIN"),
     year: int | None = Query(None, description="UAV year"),
     date_from: str | None = Query(None, alias="from"),
@@ -54,6 +56,7 @@ def domain_daily(
             domain,
             metric,
             source=source,
+            resolution=resolution,
             site=site,
             year=year,
             sensor_id=sensor_id,
@@ -69,6 +72,7 @@ def domain_daily(
 def domain_rows(
     domain: str,
     source: str | None = Query(None, description="Weather source: eccc or daymet"),
+    resolution: str | None = Query(None, description="Weather resolution: daily or hourly (ECCC only)"),
     site: str | None = Query(None, description="PIK or PIN"),
     year: int | None = Query(None, description="UAV year"),
     date_from: str | None = Query(None, alias="from"),
@@ -82,6 +86,7 @@ def domain_rows(
         return query_engine.get_rows(
             domain,
             source=source,
+            resolution=resolution,
             site=site,
             year=year,
             date_from=date_from,

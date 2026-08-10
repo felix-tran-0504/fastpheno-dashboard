@@ -27,7 +27,7 @@ python3 -m uvicorn backend.app:app --reload --port 8000
 
 Open [http://localhost:8000/fastpheno-dashboard.html](http://localhost:8000/fastpheno-dashboard.html)
 
-Parquet files under `data/fastpheno/parquet/` are built from CSV exports and are **auto-rebuilt on API startup** if missing or stale. Raw CSVs and markdown are still served at `/api/data/fastpheno/` for full downloads.
+Parquet files under `data/fastpheno/parquet/` are consolidated **one file per sensor** (weather uses three source files: `weather_eccc`, `weather_eccc_hourly`, `weather_daymet`). They are **auto-rebuilt on API startup** if missing or stale. Raw CSVs and markdown are still served at `/api/data/fastpheno/` for full downloads.
 
 Optional: copy `backend/.env.example` to `backend/.env` and set `FASTPHENO_DATA_DIR` if your data directory is not the repo default.
 
@@ -122,19 +122,32 @@ curl "http://localhost:8000/api/query/weather/rows?source=daymet&site=PIN&from=2
 
 ## Regenerating data
 
-Derived CSVs are produced from a local copy of `III_db_final`. By default the prep script expects:
-
-```text
-/Users/felixtran/Downloads/III_db_final
-```
-
-Update `SRC` in `scripts/prepare_fastpheno_data.py` if your source path differs, then run:
+Derived CSVs are produced from a local copy of `III_db_final` (synced from the UofT host or a manual download). Configure `backend/.env` (see `backend/.env.example`), then:
 
 ```bash
-python3 scripts/prepare_fastpheno_data.py        # writes CSVs; runs build_parquet at end
-python3 scripts/consolidate_uav_reflectance.py     # UAV CSVs; updates Parquet for UAV only
-python3 scripts/build_parquet.py                   # rebuild all Parquet (or --force)
-python3 scripts/verify_fastpheno_data.py
+pip install -r backend/requirements.txt
+
+# One-time: set FASTPHENO_REMOTE_USER and FASTPHENO_REMOTE_PASSWORD in backend/.env
+python3 scripts/sync_iii_db_final.py --list-remote   # confirm remote path
+
+# Full refresh: sync → prep CSVs → rebuild Parquet
+python3 scripts/refresh_from_remote.py
+
+# Or step by step:
+python3 scripts/sync_iii_db_final.py
+python3 scripts/prepare_fastpheno_data.py
+python3 scripts/build_parquet.py
+```
+
+Local staging defaults to `~/III_db_final_sync` (`FASTPHENO_III_DB_ROOT`). Remote host: `ffgg-fastpheno2.utm.utoronto.ca`.
+
+Legacy manual path (if you already have a local tree):
+
+```bash
+python3 scripts/prepare_fastpheno_data.py --weather-only   # ECCC + Daymet CSVs + weather Parquet only
+python3 scripts/prepare_fastpheno_data.py                  # all CSVs; rebuild Parquet
+python3 scripts/verify_fastpheno_data.py --weather-only
+python3 scripts/build_parquet.py                           # rebuild all Parquet (or --force)
 ```
 
 ## Stack

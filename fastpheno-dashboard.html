@@ -274,17 +274,20 @@
       <div id="sensor-controls-filters" class="controls weather-controls-filters">
       <div id="site-filter-control">
         <label for="site-filter">Site</label>
-        <select id="site-filter">
-          <option value="all">All sites</option>
-          <option value="PIK">Pickering (PIK)</option>
-          <option value="PIN" selected>Pintendre (PIN)</option>
-        </select>
+        <select id="site-filter"></select>
       </div>
       <div id="weather-source-control" class="is-hidden">
         <label for="weather-source">Source</label>
         <select id="weather-source">
           <option value="eccc" selected>ECCC</option>
           <option value="daymet">Daymet</option>
+        </select>
+      </div>
+      <div id="weather-resolution-control" class="is-hidden">
+        <label for="weather-resolution">Resolution</label>
+        <select id="weather-resolution">
+          <option value="daily" selected>Daily</option>
+          <option value="hourly">Hourly</option>
         </select>
       </div>
       <div id="weather-metric-control" class="is-hidden">
@@ -903,6 +906,26 @@ const WEATHER_METRICS_ECCC = [
   { field: "temp_interp", label: "Temp interpolated (°C)", chartLabel: "Interpolated temperature (°C)", minWidth: 140 },
   { field: "wind_spd_interp", label: "Wind speed interpolated (km/h)", chartLabel: "Interpolated wind speed (km/h)", minWidth: 160 },
 ];
+const WEATHER_METRICS_ECCC_HOURLY = [
+  { field: "temp", label: "Air temp (°C)", chartLabel: "Air temperature (°C)", minWidth: 120 },
+  { field: "temp_dew", label: "Dew point (°C)", chartLabel: "Dew point (°C)", minWidth: 120 },
+  { field: "rel_hum", label: "Relative humidity (%)", chartLabel: "Relative humidity (%)", minWidth: 130 },
+  { field: "precip_amt", label: "Precip (mm)", chartLabel: "Precipitation (mm)", minWidth: 110 },
+  { field: "pressure", label: "Pressure (kPa)", chartLabel: "Station pressure (kPa)", minWidth: 120 },
+  { field: "wind_spd", label: "Wind speed (km/h)", chartLabel: "Wind speed (km/h)", minWidth: 120 },
+  { field: "wind_dir", label: "Wind direction (°)", chartLabel: "Wind direction (°)", minWidth: 120 },
+  { field: "vpd", label: "VPD (kPa)", chartLabel: "Vapor pressure deficit (kPa)", minWidth: 110 },
+  { field: "visib", label: "Visibility (km)", chartLabel: "Visibility (km)", minWidth: 110 },
+  { field: "hmdx", label: "Humidex", chartLabel: "Humidex", minWidth: 100 },
+  { field: "wind_chill", label: "Wind chill (°C)", chartLabel: "Wind chill (°C)", minWidth: 120 },
+  { field: "temp_interp", label: "Temp interpolated (°C)", chartLabel: "Interpolated temperature (°C)", minWidth: 140 },
+  { field: "temp_dew_interp", label: "Dew point interpolated (°C)", chartLabel: "Interpolated dew point (°C)", minWidth: 150 },
+  { field: "rel_hum_interp", label: "RH interpolated (%)", chartLabel: "Interpolated relative humidity (%)", minWidth: 140 },
+  { field: "wind_spd_interp", label: "Wind speed interpolated (km/h)", chartLabel: "Interpolated wind speed (km/h)", minWidth: 160 },
+  { field: "pressure_interp", label: "Pressure interpolated (kPa)", chartLabel: "Interpolated pressure (kPa)", minWidth: 150 },
+  { field: "hmdx_interp", label: "Humidex interpolated", chartLabel: "Interpolated humidex", minWidth: 140 },
+  { field: "wind_chill_interp", label: "Wind chill interpolated (°C)", chartLabel: "Interpolated wind chill (°C)", minWidth: 160 },
+];
 const WEATHER_METRICS_DAYMET = [
   { field: "temp", label: "Mean temp (°C)", chartLabel: "Mean temperature (°C)", minWidth: 120 },
   { field: "tmax_c", label: "Max temp (°C)", chartLabel: "Maximum temperature (°C)", minWidth: 120 },
@@ -914,7 +937,10 @@ const WEATHER_METRICS_DAYMET = [
   { field: "srad_w_m2", label: "Shortwave rad (W/m²)", chartLabel: "Shortwave radiation (W/m²)", minWidth: 140 },
   { field: "vp_Pa", label: "Vapor pressure (Pa)", chartLabel: "Vapor pressure (Pa)", minWidth: 130 },
 ];
-const METRIC_ALL = "all";
+const WEATHER_SITE_COLORS = [
+  "#336633", "#cc6600", "#4169E1", "#993366", "#2F4F4F",
+  "#8B4513", "#4682B4", "#6A5ACD", "#C71585", "#228B22",
+];
 const CAMPAIGN_METRIC_COLORS = [
   "#993366", "#669933", "#228B22", "#cc6600", "#4169E1", "#336633", "#cc3333",
   "#996633", "#333399", "#2F4F4F", "#8B4513", "#4682B4", "#6A5ACD", "#C71585",
@@ -923,7 +949,7 @@ const TABLE_TEXT_FIELDS = new Set([
   "site", "year", "date", "primary_key", "datetime_est", "sensor", "operator",
   "Measurement_ID", "time_EST", "time_GMT", "time", "campaign", "sample",
   "acquisition_time", "orientation", "measurement_number", "rank_within_tree",
-  "site_id", "Cluster", "Genotype",
+  "site_id", "Cluster", "Genotype", "time",
 ]);
 const TABLE_FROZEN_FIELDS = new Set(["site", "year", "date", "site_id"]);
 const WP_COLUMNS = [
@@ -978,7 +1004,7 @@ const ERD_DOMAINS = {
     title: "Environmental Data",
     blurb: "Site-level climate and environment keyed by siteID.",
     entities: [
-      { id: "climate", title: "Climate", desc: "Site climate / weather (current build: ECCC and Daymet daily).", pk: "siteID", available: true, sensor: "weather" },
+      { id: "climate", title: "Climate", desc: "Site climate / weather (ECCC daily & hourly, Daymet daily).", pk: "siteID", available: true, sensor: "weather" },
       { id: "soil_moisture", title: "Soil moisture", desc: "Soil moisture and temperature from field sensors.", pk: "siteID", available: true, sensor: "soil_moisture" },
       { id: "soil_texture", title: "Soil texture", desc: "Soil texture classes and related properties.", pk: "siteID", available: false },
     ],
@@ -1077,22 +1103,36 @@ async function fetchCampaignRowsForSeries(kind, series) {
 
 async function loadWeatherMeta() {
   const source = getWeatherSource();
-  const siteFilter = document.getElementById("site-filter")?.value || "all";
-  const apiSite = siteFilter === "all" ? null : siteFilter;
-  const key = `${source}:${siteFilter}`;
+  const resolution = getWeatherResolution();
+  const site = getWeatherSite();
+  const key = `${source}:${resolution}:${site}`;
   if (weatherMeta && weatherMetaKey === key) return weatherMeta;
-  const params = { source };
-  if (apiSite) params.site = apiSite;
-  weatherMeta = await queryJson(buildQuery("/weather/meta", params));
+  weatherMeta = await queryJson(buildQuery("/weather/meta", { source, resolution, site }));
   weatherMetaKey = key;
+  populateWeatherSiteFilter();
   return weatherMeta;
+}
+
+function populateWeatherSiteFilter() {
+  const sel = document.getElementById("site-filter");
+  if (!sel) return;
+  const current = sel.value;
+  const sites = weatherMeta?.sites || [];
+  sel.innerHTML = sites.map(site => `<option value="${site}">${site}</option>`).join("");
+  if (sites.includes(current)) {
+    sel.value = current;
+  } else if (sites.includes(DEFAULT_SITE)) {
+    sel.value = DEFAULT_SITE;
+  } else if (sites.length) {
+    sel.value = sites[0];
+  }
 }
 
 async function fetchWeatherRows() {
   const source = getWeatherSource();
-  const siteFilter = document.getElementById("site-filter")?.value || "all";
-  const params = { source, all: "true" };
-  if (siteFilter !== "all") params.site = siteFilter;
+  const resolution = getWeatherResolution();
+  const site = getWeatherSite();
+  const params = { source, resolution, site, all: "true" };
   if (weatherDateMode === "single") {
     const d = document.getElementById("weather-date")?.value || "";
     if (d) { params.from = d; params.to = d; }
@@ -1110,6 +1150,7 @@ async function fetchWeatherRows() {
 async function ensureSensorReady(sensorId) {
   if (!QUERY_BASE) return false;
   if (sensorId === "weather") {
+    syncWeatherResolutionControl();
     await loadWeatherMeta();
     populateWeatherMetricFilter();
     syncWeatherDateInputs(true);
@@ -1212,15 +1253,6 @@ function stripReflectanceBoilerplate(md) {
     i++;
   }
   return out.join("\n");
-}
-
-function stripVpdFromMarkdown(md) {
-  return md.replace(/\r\n/g, "\n").split("\n").filter(line => {
-    const trimmed = line.trim();
-    if (/^\|\s*vpd\s*\|/i.test(trimmed)) return false;
-    if (/^-\s+.*\bvpd\b/i.test(trimmed)) return false;
-    return true;
-  }).join("\n");
 }
 
 function renderMarkdown(md) {
@@ -1514,10 +1546,13 @@ async function resetFlightFiltersForModeSwitch(fsId) {
 async function resetWeatherFiltersForModeSwitch() {
   const siteEl = document.getElementById("site-filter");
   const sourceEl = document.getElementById("weather-source");
+  const resolutionEl = document.getElementById("weather-resolution");
   if (siteEl) siteEl.value = DEFAULT_SITE;
   if (sourceEl) sourceEl.value = "eccc";
+  if (resolutionEl) resolutionEl.value = "daily";
   weatherMeta = null;
   weatherMetaKey = "";
+  syncWeatherResolutionControl();
   await loadWeatherMeta();
   populateWeatherMetricFilter();
   syncWeatherDateInputs(true);
@@ -1606,8 +1641,6 @@ function isMetricRedundantDuplicate(rows, field, otherField) {
 }
 
 function getCampaignMetricSiteGroups(rows, siteField = "site") {
-  const siteFilter = document.getElementById("site-filter").value;
-  if (siteFilter !== "all") return new Map([[siteFilter, rows]]);
   const bySite = new Map();
   for (const row of rows) {
     const site = (row[siteField] || "").toUpperCase();
@@ -1655,15 +1688,7 @@ function getVariableReflectanceChartMetrics() {
 }
 
 function getWeatherMetricSiteGroups(rows) {
-  const siteFilter = document.getElementById("site-filter").value;
-  if (siteFilter !== "all") return new Map([[siteFilter, rows]]);
-  const bySite = new Map();
-  for (const row of rows) {
-    const site = (row.site_id || "").toUpperCase();
-    if (!bySite.has(site)) bySite.set(site, []);
-    bySite.get(site).push(row);
-  }
-  return bySite;
+  return new Map([[getWeatherSite(), rows]]);
 }
 
 function getVariableWeatherMetrics(rows, metrics) {
@@ -1700,23 +1725,27 @@ function getVariableWeatherMetricsForCurrentData() {
 }
 
 function getWeatherBaseRows() {
-  return weatherRows.slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  return weatherRows.slice().sort((a, b) => weatherRowSortKey(a).localeCompare(weatherRowSortKey(b)));
 }
 
 function getWeatherAvailableDates() {
   return (weatherMeta?.available_dates || []).slice().sort();
 }
 
+function getWeatherResolvedSource() {
+  if (getWeatherSource() === "daymet") return "daymet";
+  return isWeatherHourly() ? "eccc_hourly" : "eccc";
+}
+
 function getWeatherDateBounds() {
-  const source = getWeatherSource();
-  const siteFilter = document.getElementById("site-filter")?.value || "all";
-  const bounds = weatherMeta?.bounds?.[source];
-  if (!bounds) return null;
-  const sites = siteFilter === "all" ? ["PIK", "PIN"] : [siteFilter];
-  const mins = sites.map(s => bounds[s]?.min_date).filter(Boolean).map(d => String(d).slice(0, 10));
-  const maxs = sites.map(s => bounds[s]?.max_date).filter(Boolean).map(d => String(d).slice(0, 10));
-  if (!mins.length || !maxs.length) return null;
-  return { first: mins.sort()[0], last: maxs.sort().slice(-1)[0] };
+  const source = getWeatherResolvedSource();
+  const site = getWeatherSite();
+  const bounds = weatherMeta?.bounds?.[source]?.[site];
+  if (!bounds?.min_date || !bounds?.max_date) return null;
+  return {
+    first: String(bounds.min_date).slice(0, 10),
+    last: String(bounds.max_date).slice(0, 10),
+  };
 }
 
 function formatWeatherDetailValue(raw) {
@@ -1875,11 +1904,12 @@ function syncWeatherDateInputs(reset = false) {
 
 function updateWeatherDateModeUI() {
   const isSingle = weatherDateMode === "single";
+  const isHourly = isWeatherHourly();
   setVisible("weather-single-controls", isSingle);
   setVisible("weather-range-from", !isSingle);
   setVisible("weather-range-to", !isSingle);
   if (activeSensor === "weather") {
-    setVisible("weather-metric-control", !isSingle);
+    setVisible("weather-metric-control", !isSingle || isHourly);
   }
 }
 
@@ -1901,6 +1931,7 @@ function matchesWeatherDateFilter(row, dateField) {
 
 function formatWeatherDatasetCount(count) {
   let rangeLabel = "";
+  const unit = isWeatherHourly() ? "hour" : "row";
   if (weatherDateMode === "single") {
     const d = document.getElementById("weather-date").value;
     if (d) rangeLabel = ` (${formatWeatherDisplay(d)})`;
@@ -1911,7 +1942,7 @@ function formatWeatherDatasetCount(count) {
     else if (from) rangeLabel = ` (from ${from})`;
     else if (to) rangeLabel = ` (through ${to})`;
   }
-  return `${count} weather row${count === 1 ? "" : "s"}${rangeLabel}`;
+  return `${count} weather ${unit}${count === 1 ? "" : "s"}${rangeLabel}`;
 }
 
 function isCampaignRangeMode(kind) {
@@ -2358,8 +2389,54 @@ function getWeatherSource() {
   return document.getElementById("weather-source").value;
 }
 
+function getWeatherSite() {
+  const sel = document.getElementById("site-filter");
+  const value = sel?.value;
+  if (value) return value;
+  const sites = weatherMeta?.sites || [];
+  if (sites.includes(DEFAULT_SITE)) return DEFAULT_SITE;
+  return sites[0] || DEFAULT_SITE;
+}
+
+function getWeatherResolution() {
+  return document.getElementById("weather-resolution")?.value || "daily";
+}
+
+function isWeatherHourly() {
+  return getWeatherSource() === "eccc" && getWeatherResolution() === "hourly";
+}
+
+function syncWeatherResolutionControl() {
+  const resolutionEl = document.getElementById("weather-resolution");
+  if (!resolutionEl) return;
+  const hourlyOpt = resolutionEl.querySelector('option[value="hourly"]');
+  const daymet = getWeatherSource() === "daymet";
+  if (hourlyOpt) hourlyOpt.disabled = daymet;
+  if (daymet && resolutionEl.value === "hourly") resolutionEl.value = "daily";
+}
+
+function weatherRowSortKey(row) {
+  if (!isWeatherHourly()) return String(row.date || "");
+  const timePart = String(row.time || "").slice(11, 19);
+  return `${row.date || ""}T${timePart || "00:00:00"}`;
+}
+
+function weatherRowChartLabel(row) {
+  if (!isWeatherHourly()) return row.date;
+  const time = String(row.time || "");
+  if (time.length >= 16) return time.slice(0, 16).replace("T", " ");
+  return `${row.date} ${time.slice(11, 16) || "00:00"}`;
+}
+
+function weatherRowTimeLabel(row) {
+  const time = String(row.time || "");
+  if (time.length >= 16) return time.slice(11, 16);
+  return time || "—";
+}
+
 function getWeatherMetrics() {
-  return getWeatherSource() === "daymet" ? WEATHER_METRICS_DAYMET : WEATHER_METRICS_ECCC;
+  if (getWeatherSource() === "daymet") return WEATHER_METRICS_DAYMET;
+  return isWeatherHourly() ? WEATHER_METRICS_ECCC_HOURLY : WEATHER_METRICS_ECCC;
 }
 
 function getFilteredWeather() {
@@ -3254,7 +3331,8 @@ function updateVisibility() {
 
   setVisible("weather-controls-view", activeSensor === "weather");
   setVisible("weather-source-control", activeSensor === "weather");
-  setVisible("weather-metric-control", activeSensor === "weather" && weatherDateMode !== "single");
+  setVisible("weather-resolution-control", activeSensor === "weather");
+  setVisible("weather-metric-control", activeSensor === "weather" && (weatherDateMode !== "single" || isWeatherHourly()));
   const hasSoilActive = activeSensor === "soil_moisture";
   setVisible("soil-site-control", hasSoilActive);
   setVisible("soil-sensor-control", hasSoilActive);
@@ -3280,7 +3358,10 @@ function updateVisibility() {
     }
   });
   document.getElementById("sensor-controls").classList.toggle("weather-active", activeSensor === "weather");
-  if (activeSensor === "weather") updateWeatherDateModeUI();
+  if (activeSensor === "weather") {
+    syncWeatherResolutionControl();
+    updateWeatherDateModeUI();
+  }
   ["fluor", "refl", "wp"].forEach(kind => {
     const sensor = CAMPAIGN_ACTIVE_SENSOR[kind];
     const active = activeSensor === sensor;
@@ -3330,7 +3411,9 @@ async function updateWeatherSection() {
     return;
   }
   const requestId = ++weatherRequestId;
-  const loadingSingle = weatherDateMode === "single";
+  const isHourly = isWeatherHourly();
+  const isSingle = weatherDateMode === "single";
+  const loadingSingle = isSingle && !isHourly;
   document.getElementById("weather-count").textContent = "Loading weather data…";
   setVisible("weather-count", !loadingSingle);
   if (loadingSingle) {
@@ -3356,36 +3439,43 @@ async function updateWeatherSection() {
   }
   if (requestId !== weatherRequestId) return;
   populateWeatherMetricFilter();
-  const isSingle = weatherDateMode === "single";
   const rows = getWeatherRows();
   const hasData = rows.length > 0;
-  setVisible("weather-single-view", isSingle && hasData);
-  setVisible("weather-chart-box", !isSingle && hasData);
-  setVisible("weather-range-label", !isSingle && hasData);
-  setVisible("weather-table", !isSingle && hasData);
-  setVisible("weather-count", !isSingle && hasData);
-  setVisible("weather-table-footer", !isSingle && hasData);
+  const showChart = hasData && (!isSingle || isHourly);
+  const showSinglePanel = hasData && isSingle && !isHourly;
+  const showTable = hasData && (!isSingle || isHourly);
+  setVisible("weather-single-view", showSinglePanel);
+  setVisible("weather-chart-box", showChart);
+  setVisible("weather-range-label", showChart);
+  setVisible("weather-table", showTable);
+  setVisible("weather-count", showChart);
+  setVisible("weather-table-footer", showTable);
   if (!hasData) {
     destroyChart("weather");
     document.getElementById("weather-count").textContent =
-      "No weather rows for the selected site, source, and dates.";
+      "No weather rows for the selected site, source, resolution, and dates.";
     setVisible("weather-count", true);
     return;
   }
-  const sourceLabel = getWeatherSource() === "daymet" ? "Daymet" : "ECCC";
-  if (isSingle) {
+  const sourceLabel = getWeatherSource() === "daymet" ? "Daymet" : (isHourly ? "ECCC hourly" : "ECCC daily");
+  if (showSinglePanel) {
     renderWeatherDetailPanel(rows);
     destroyChart("weather");
     document.getElementById("weather-count").textContent = "";
   } else {
     document.getElementById("weather-count").textContent = formatWeatherDatasetCount(rows.length);
-    const uniqueDates = [...new Set(rows.map(r => r.date))].sort();
-    document.getElementById("weather-range-label").textContent = uniqueDates.length
-      ? `${uniqueDates.length} days · ${uniqueDates[0]} to ${uniqueDates[uniqueDates.length - 1]}`
-      : "No days in range";
+    if (isHourly && isSingle) {
+      document.getElementById("weather-range-label").textContent =
+        `${rows.length} hour${rows.length === 1 ? "" : "s"} · ${formatWeatherDisplay(document.getElementById("weather-date").value)}`;
+    } else {
+      const uniqueDates = [...new Set(rows.map(r => r.date))].sort();
+      document.getElementById("weather-range-label").textContent = uniqueDates.length
+        ? `${uniqueDates.length} day${uniqueDates.length === 1 ? "" : "s"} · ${uniqueDates[0]} to ${uniqueDates[uniqueDates.length - 1]}`
+        : "No days in range";
+    }
     document.getElementById("weather-chart-title").textContent = `${sourceLabel} — ${getWeatherChartLabel(document.getElementById("weather-metric").value)}`;
     updateWeatherChart();
-    weatherTable = initWeatherTable(getWeatherTableColumns(), getWeatherRows);
+    if (showTable) weatherTable = initWeatherTable(getWeatherTableColumns(), getWeatherRows);
   }
 }
 
@@ -3419,12 +3509,14 @@ function initWeatherTable(columns, getRows) {
 }
 
 function getWeatherDownloadFilename() {
-  const site = document.getElementById("site-filter").value;
+  const site = getWeatherSite();
   const source = getWeatherSource();
+  const resolution = getWeatherResolution();
   const from = document.getElementById("weather-from-date")?.value || "";
   const to = document.getElementById("weather-to-date")?.value || "";
   const range = from && to ? `_${from}_to_${to}` : "";
-  return `weather_${source}_${site}${range}.csv`;
+  const resPart = resolution === "hourly" ? "_hourly" : "";
+  return `weather_${source}${resPart}_${site}${range}.csv`;
 }
 
 function downloadWeatherCsv() {
@@ -3500,16 +3592,15 @@ async function downloadSourceCsvFile(filename) {
 
 async function downloadWeatherFullCsv() {
   const source = getWeatherSource();
-  const siteFilter = document.getElementById("site-filter")?.value || "all";
-  const params = { source, all: "true" };
-  if (siteFilter !== "all") params.site = siteFilter;
+  const resolution = getWeatherResolution();
+  const site = getWeatherSite();
+  const params = { source, resolution, site, all: "true" };
   try {
     const payload = await queryJson(buildQuery("/weather/rows", params));
     const rows = payload.rows || [];
     if (!rows.length) return;
     const fields = getWeatherTableColumns().map(col => col.field);
-    const sitePart = siteFilter === "all" ? "all_sites" : siteFilter;
-    downloadRowsAsCsv(rows, fields, `weather_${source}_${sitePart}_full.csv`);
+    downloadRowsAsCsv(rows, fields, `weather_${source}_${site}_full.csv`);
   } catch (err) {
     console.error(err);
     alert("Could not download full weather dataset.");
@@ -3573,6 +3664,15 @@ function getWeatherTableColumns() {
     { title: "Site", field: "site_id", width: 70, frozen: true },
     { title: "Date", field: "date", sorter: "string", minWidth: 110, frozen: true },
   ];
+  if (isWeatherHourly()) {
+    base.push({
+      title: "Time (UTC)",
+      field: "time",
+      sorter: "string",
+      minWidth: 90,
+      formatter: cell => weatherRowTimeLabel({ time: cell.getValue() }),
+    });
+  }
   const metrics = getVariableWeatherMetricsForCurrentData();
   return [
     ...base,
@@ -3643,31 +3743,55 @@ function destroyChart(id) {
   if (charts[id]) { charts[id].destroy(); delete charts[id]; }
 }
 
+function weatherSiteColor(index) {
+  return WEATHER_SITE_COLORS[index % WEATHER_SITE_COLORS.length];
+}
+
+function weatherSiteFillColor(hexColor) {
+  const hex = hexColor.slice(1);
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},0.1)`;
+}
+
 function updateWeatherChart() {
   destroyChart("weather");
   if (!hasWeatherData()) return;
   const metric = document.getElementById("weather-metric").value;
   const chartLabel = getWeatherChartLabel(metric);
-  const rows = getWeatherRows().sort((a, b) => a.date.localeCompare(b.date));
-  const site = document.getElementById("site-filter").value;
+  const site = getWeatherSite();
+  const rows = getWeatherRows()
+    .filter(r => (r.site_id || "").toUpperCase() === site)
+    .sort((a, b) => weatherRowSortKey(a).localeCompare(weatherRowSortKey(b)));
   const yVal = r => weatherValue(r[metric]);
-  const datasets = [];
-  const pik = rows.filter(r => (r.site_id || "").toUpperCase() === "PIK");
-  const pin = rows.filter(r => (r.site_id || "").toUpperCase() === "PIN");
-  if (pik.length && (site === "all" || site === "PIK")) {
-    datasets.push({ label: "PIK", data: pik.map(r => ({ x: r.date, y: yVal(r) })), borderColor: "#336633", backgroundColor: "rgba(51,102,51,0.1)", tension: 0.2, pointRadius: 0, borderWidth: 1.5, spanGaps: false });
-  }
-  if (pin.length && (site === "all" || site === "PIN")) {
-    datasets.push({ label: "PIN", data: pin.map(r => ({ x: r.date, y: yVal(r) })), borderColor: "#cc6600", backgroundColor: "rgba(204,102,0,0.1)", tension: 0.2, pointRadius: 0, borderWidth: 1.5, spanGaps: false });
-  }
-  if (!datasets.length) return;
+  const pointRadius = isWeatherHourly() ? 1 : 0;
+  if (!rows.length) return;
+  const color = weatherSiteColor(0);
+  const datasets = [{
+    label: site,
+    data: rows.map(r => ({ x: weatherRowChartLabel(r), y: yVal(r) })),
+    borderColor: color,
+    backgroundColor: weatherSiteFillColor(color),
+    tension: 0.2,
+    pointRadius,
+    borderWidth: 1.5,
+    spanGaps: false,
+  }];
   const ctx = document.getElementById("weather-chart");
   charts.weather = new Chart(ctx, {
     type: "line",
     data: { datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
-      scales: { x: { type: "category", ticks: { maxTicksLimit: 12, font: { size: 9 } } }, y: { title: { display: true, text: chartLabel, font: { size: 9 } }, ticks: { font: { size: 9 } } } },
+      scales: {
+        x: {
+          type: "category",
+          ticks: { maxTicksLimit: isWeatherHourly() ? 24 : 12, font: { size: 9 } },
+          title: isWeatherHourly() ? { display: true, text: "Time (UTC)", font: { size: 9 } } : undefined,
+        },
+        y: { title: { display: true, text: chartLabel, font: { size: 9 } }, ticks: { font: { size: 9 } } },
+      },
       plugins: { legend: { labels: { font: { size: 9 } } } }
     }
   });
@@ -4631,14 +4755,14 @@ function populateWeatherMetricFilter() {
 }
 
 function loadWeatherMetadata() {
-  const path = getWeatherSource() === "daymet" ? "weather_daymet.md" : "weather.md";
+  let path = "weather.md";
+  if (getWeatherSource() === "daymet") path = "weather_daymet.md";
+  else if (isWeatherHourly()) path = "weather_hourly.md";
   const panel = document.getElementById("weather-metadata");
   panel.classList.add("loading");
   return loadMarkdown(DATA_BASE + path)
     .then(md => {
-      let content = md;
-      if (path === "weather.md") content = stripVpdFromMarkdown(md);
-      panel.innerHTML = renderMarkdown(content);
+      panel.innerHTML = renderMarkdown(md);
       panel.classList.remove("loading");
     })
     .catch(err => {
@@ -4651,12 +4775,27 @@ async function onWeatherSourceChange() {
   weatherMeta = null;
   weatherMetaKey = "";
   weatherRows = [];
+  syncWeatherResolutionControl();
   loadWeatherMetadata();
   if (QUERY_BASE) {
     await loadWeatherMeta();
     syncWeatherDateInputs(true);
   }
   populateWeatherMetricFilter();
+  await updateWeatherSection();
+}
+
+async function onWeatherResolutionChange() {
+  weatherMeta = null;
+  weatherMetaKey = "";
+  weatherRows = [];
+  loadWeatherMetadata();
+  if (QUERY_BASE) {
+    await loadWeatherMeta();
+    syncWeatherDateInputs(true);
+  }
+  populateWeatherMetricFilter();
+  updateWeatherDateModeUI();
   await updateWeatherSection();
 }
 
@@ -4700,6 +4839,7 @@ document.getElementById("site-filter").addEventListener("change", async () => {
   await refreshAll();
 });
 document.getElementById("weather-source").addEventListener("change", onWeatherSourceChange);
+document.getElementById("weather-resolution").addEventListener("change", onWeatherResolutionChange);
 document.getElementById("weather-metric").addEventListener("change", updateWeatherSection);
 ["soil-site", "soil-sensor", "soil-interval", "soil-metric", "soil-from-date", "soil-to-date"].forEach(id => {
   document.getElementById(id)?.addEventListener("change", () => {

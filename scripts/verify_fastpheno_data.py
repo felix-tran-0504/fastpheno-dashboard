@@ -1,14 +1,24 @@
 #!/usr/bin/env python3
 """Verify derived FastPheno CSVs match III_db_final source rows."""
 
+import argparse
 import csv
+import filecmp
 import re
 import sys
 from pathlib import Path
 
-from prepare_fastpheno_data import FLUORESCENCE_KEEP, REFLECTANCE_KEEP, project_rows
+from prepare_fastpheno_data import (
+    FLUORESCENCE_KEEP,
+    REFLECTANCE_KEEP,
+    build_daymet_weather,
+    eccc_weather_sites,
+    project_rows,
+)
+from fastpheno_env import get_iii_db_root, load_env
 
-SRC = Path("/Users/felixtran/Downloads/III_db_final")
+load_env()
+SRC = get_iii_db_root()
 OUT = Path(__file__).resolve().parents[1] / "data" / "fastpheno"
 SITE_MAP = {"Pintendre": "PIN", "Pickering": "PIK"}
 DATE_IN_NAME = re.compile(r"(20\d{2}-\d{2}-\d{2})")
@@ -141,12 +151,75 @@ def compare(name: str, expected: list[dict], actual: list[dict]) -> bool:
     return False
 
 
+def compare_files(name: str, expected_path: Path, actual_path: Path) -> bool:
+    if not expected_path.is_file():
+        print(f"FAIL {name}: missing source {expected_path}")
+        return False
+    if not actual_path.is_file():
+        print(f"FAIL {name}: missing export {actual_path}")
+        return False
+    if filecmp.cmp(expected_path, actual_path, shallow=False):
+        print(f"OK  {name}: byte-identical to source")
+        return True
+    print(f"FAIL {name}: differs from {expected_path}")
+    return False
+
+
+def verify_weather() -> bool:
+    ok = True
+    for site in eccc_weather_sites():
+        src = SRC / "Weather" / "ECCC" / site / "Daily" / f"{site}_daily_2010-2024.csv"
+        ok &= compare_files(f"{site}_daily_2010-2024.csv", src, OUT / f"{site}_daily_2010-2024.csv")
+        src_hourly = SRC / "Weather" / "ECCC" / site / "Hourly" / f"{site}_hourly_2022-2024.csv"
+        ok &= compare_files(f"{site}_hourly_2022-2024.csv", src_hourly, OUT / f"{site}_hourly_2022-2024.csv")
+
+    # Rebuild expected Daymet exports in memory and compare row counts + sample keys.
+    from tempfile import TemporaryDirectory
+
+    with TemporaryDirectory() as tmp:
+        tmp_out = Path(tmp)
+        import prepare_fastpheno_data as prep
+
+        old_out = prep.OUT
+        try:
+            prep.OUT = tmp_out
+            build_daymet_weather()
+            for site in eccc_weather_sites():
+                expected_path = tmp_out / f"{site}_daymet_daily_2010-2024.csv"
+                actual_path = OUT / f"{site}_daymet_daily_2010-2024.csv"
+                if not actual_path.is_file():
+                    print(f"FAIL {site}_daymet_daily_2010-2024.csv: missing export")
+                    ok = False
+                    continue
+                exp_rows = read_csv_rows(expected_path)
+                act_rows = read_csv_rows(actual_path)
+                if exp_rows == act_rows:
+                    print(f"OK  {site}_daymet_daily_2010-2024.csv: {len(act_rows)} rows match source")
+                else:
+                    print(
+                        f"FAIL {site}_daymet_daily_2010-2024.csv: "
+                        f"expected {len(exp_rows)} rows, got {len(act_rows)}"
+                    )
+                    ok = False
+        finally:
+            prep.OUT = old_out
+    return ok
+
+
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Verify FastPheno CSV exports against III_db_final")
+    parser.add_argument("--weather-only", action="store_true", help="Verify weather exports only")
+    args = parser.parse_args()
+
     if not SRC.is_dir():
         print(f"Source database not found: {SRC}", file=sys.stderr)
         return 1
 
+    if args.weather_only:
+        return 0 if verify_weather() else 1
+
     ok = True
+    ok &= verify_weather()
     ok &= compare(
         "fluorescence_indices.csv",
         build_expected_fluorescence(),

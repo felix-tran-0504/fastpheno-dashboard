@@ -8,15 +8,31 @@ from pathlib import Path
 from typing import Any
 
 from .. import config
+from . import parquet_registry
 
 _SPATIAL_CSV_RE = re.compile(r"^uav_(lidar|gnss)_(pik|pin)_(\d{4})\.csv$", re.I)
+_WEATHER_DAILY_RE = re.compile(r"^([A-Z0-9]+)_daily_2010-2024\.csv$", re.I)
 
 DATA_DIR = config.DATA_DIR
 PARQUET_DIR = config.PARQUET_DIR
 
+# One Parquet file per sensor (weather has three source-specific files).
+SENSOR_PARQUET: dict[str, Path] = {
+    "fluorescence": PARQUET_DIR / "fluorescence.parquet",
+    "reflectance": PARQUET_DIR / "reflectance.parquet",
+    "wp": PARQUET_DIR / "wp.parquet",
+    "soil_moisture": PARQUET_DIR / "soil_moisture.parquet",
+    "weather_eccc": PARQUET_DIR / "weather_eccc.parquet",
+    "weather_eccc_hourly": PARQUET_DIR / "weather_eccc_hourly.parquet",
+    "weather_daymet": PARQUET_DIR / "weather_daymet.parquet",
+    "uav": PARQUET_DIR / "uav.parquet",
+    "lidar": PARQUET_DIR / "lidar.parquet",
+    "gnss": PARQUET_DIR / "gnss.parquet",
+}
+
 
 def parquet_for(csv_path: Path) -> Path:
-    """Map a CSV export to its Parquet query file."""
+    """Legacy 1:1 CSV→Parquet path (used for catalog CSV names only)."""
     return PARQUET_DIR / f"{csv_path.stem}.parquet"
 
 
@@ -30,16 +46,39 @@ class DomainConfig:
     metadata_file: str | None = None
 
 
-WEATHER_CSV = {
-    "eccc": {
-        "PIK": DATA_DIR / "PIK_daily_2010-2024.csv",
-        "PIN": DATA_DIR / "PIN_daily_2010-2024.csv",
-    },
-    "daymet": {
-        "PIK": DATA_DIR / "PIK_daymet_daily_2010-2024.csv",
-        "PIN": DATA_DIR / "PIN_daymet_daily_2010-2024.csv",
-    },
-}
+def discover_weather_sites_from_csv() -> list[str]:
+    """Site IDs from exported ECCC daily CSVs (parquet build / prep only)."""
+    sites: list[str] = []
+    for path in DATA_DIR.glob("*_daily_2010-2024.csv"):
+        match = _WEATHER_DAILY_RE.match(path.name)
+        if match:
+            sites.append(match.group(1).upper())
+    return sorted(set(sites))
+
+
+def discover_weather_sites() -> list[str]:
+    """Runtime site list: Parquet when available, else CSV filenames on disk."""
+    return parquet_registry.weather_sites()
+
+
+def build_weather_csv() -> dict[str, dict[str, Path]]:
+    sites = discover_weather_sites_from_csv()
+    eccc = {s: DATA_DIR / f"{s}_daily_2010-2024.csv" for s in sites}
+    hourly = {
+        s: DATA_DIR / f"{s}_hourly_2022-2024.csv"
+        for s in sites
+        if (DATA_DIR / f"{s}_hourly_2022-2024.csv").is_file()
+    }
+    daymet = {
+        s: DATA_DIR / f"{s}_daymet_daily_2010-2024.csv"
+        for s in sites
+        if (DATA_DIR / f"{s}_daymet_daily_2010-2024.csv").is_file()
+    }
+    return {"eccc": eccc, "eccc_hourly": hourly, "daymet": daymet}
+
+
+# CSV paths for parquet build, catalog filenames, and static downloads (may be absent at runtime).
+WEATHER_CSV = build_weather_csv()
 
 WEATHER_METRICS = {
     "eccc": [
@@ -47,11 +86,60 @@ WEATHER_METRICS = {
         "wind_spd", "wind_dir", "vpd", "heat_deg_days", "cool_deg_days",
         "temp_interp", "wind_spd_interp",
     ],
+    "eccc_hourly": [
+        "temp", "temp_dew", "rel_hum", "precip_amt", "pressure", "wind_spd", "wind_dir",
+        "vpd", "visib", "hmdx", "wind_chill",
+        "temp_interp", "temp_dew_interp", "rel_hum_interp", "wind_spd_interp",
+        "pressure_interp", "hmdx_interp", "wind_chill_interp",
+    ],
     "daymet": [
         "temp", "tmax_c", "tmin_c", "prcp_mm_day", "vpd_kpa", "par_w_m2",
         "par_mol_m2_day", "srad_w_m2", "vp_Pa",
     ],
 }
+
+WEATHER_RESOLUTIONS = {"daily", "hourly"}
+
+
+def _weather_csv_name(source: str, site: str) -> str:
+    src = source.lower()
+    if src == "eccc":
+        return f"{site}_daily_2010-2024.csv"
+    if src == "eccc_hourly":
+        return f"{site}_hourly_2022-2024.csv"
+    if src == "daymet":
+        return f"{site}_daymet_daily_2010-2024.csv"
+    return f"{site}_{src}.csv"
+
+
+def weather_sites() -> list[str]:
+    """Runtime Climate site IDs (Parquet-first, CSV fallback)."""
+    return parquet_registry.weather_sites()
+
+
+def weather_sites_for_source(source: str) -> list[str]:
+    return parquet_registry.weather_sites_for_source(source)
+
+
+def spatial_years_for_site(domain: str, site: str) -> list[int]:
+    return parquet_registry.spatial_years_for_site(domain, site)
+
+
+def spatial_export_filename(domain: str, site: str, year: int) -> str:
+    return parquet_registry.spatial_export_filename(domain, site, year)
+
+
+def clear_parquet_discovery_cache() -> None:
+    parquet_registry.clear_discovery_cache()
+
+
+def weather_csv_name(source: str, site: str) -> str:
+    return _weather_csv_name(source, site)
+
+
+def weather_has_site(source: str, site: str) -> bool:
+    return parquet_registry.weather_has_site(source, site)
+
 
 UAV_CSV = {
     2022: DATA_DIR / "uav_reflectance_2022.csv",
@@ -85,20 +173,30 @@ TABLE_CSV = {
     "soil_moisture": DATA_DIR / "soil_moisture.csv",
 }
 
-# Parquet paths used by DuckDB views / query engine
-TABLE_DOMAINS: dict[str, Path] = {k: parquet_for(v) for k, v in TABLE_CSV.items()}
-
-WEATHER_VIEWS: dict[str, Path] = {
-    f"weather_{source}_{site.lower()}": parquet_for(path)
-    for source, sites in WEATHER_CSV.items()
-    for site, path in sites.items()
+# Parquet paths used by DuckDB views / query engine (one file per sensor)
+TABLE_DOMAINS: dict[str, Path] = {
+    "fluorescence": SENSOR_PARQUET["fluorescence"],
+    "reflectance": SENSOR_PARQUET["reflectance"],
+    "wp": SENSOR_PARQUET["wp"],
+    "soil_moisture": SENSOR_PARQUET["soil_moisture"],
 }
 
-UAV_DATASETS: dict[int, Path] = {year: parquet_for(path) for year, path in UAV_CSV.items()}
+WEATHER_PARQUET: dict[str, Path] = {
+    "eccc": SENSOR_PARQUET["weather_eccc"],
+    "eccc_hourly": SENSOR_PARQUET["weather_eccc_hourly"],
+    "daymet": SENSOR_PARQUET["weather_daymet"],
+}
+
+UAV_PARQUET = SENSOR_PARQUET["uav"]
+LIDAR_PARQUET = SENSOR_PARQUET["lidar"]
+GNSS_PARQUET = SENSOR_PARQUET["gnss"]
+
+# Year -> CSV path (catalog / downloads); queries read consolidated UAV_PARQUET.
+UAV_DATASETS = UAV_CSV
 
 
-def _discover_spatial_parquet(kind: str) -> dict[tuple[str, int], Path]:
-    """Map (site, year) -> parquet path for uav_lidar_* / uav_gnss_* exports."""
+def _discover_spatial_csvs(kind: str) -> dict[tuple[str, int], Path]:
+    """Map (site, year) -> CSV path for uav_lidar_* / uav_gnss_* exports."""
     out: dict[tuple[str, int], Path] = {}
     for csv_path in sorted(DATA_DIR.glob(f"uav_{kind}_*.csv")):
         match = _SPATIAL_CSV_RE.match(csv_path.name)
@@ -106,17 +204,25 @@ def _discover_spatial_parquet(kind: str) -> dict[tuple[str, int], Path]:
             continue
         site = match.group(2).upper()
         year = int(match.group(3))
-        out[(site, year)] = parquet_for(csv_path)
+        out[(site, year)] = csv_path
     return out
 
 
 UAV_SPATIAL: dict[str, dict[tuple[str, int], Path]] = {
-    "lidar": _discover_spatial_parquet("lidar"),
-    "gnss": _discover_spatial_parquet("gnss"),
+    "lidar": _discover_spatial_csvs("lidar"),
+    "gnss": _discover_spatial_csvs("gnss"),
 }
 
-# CSV paths for downloads and dataset catalog (source of truth)
-WEATHER_SOURCES = WEATHER_CSV
+
+def spatial_catalog(domain: str) -> dict[tuple[str, int], str]:
+    """(site, year) -> export CSV filename for lidar/gnss (Parquet-first)."""
+    domain = domain.lower()
+    out: dict[tuple[str, int], str] = {}
+    for site, year in parquet_registry.spatial_site_years(domain):
+        csv_path = UAV_SPATIAL.get(domain, {}).get((site, year))
+        name = csv_path.name if csv_path else parquet_registry.spatial_export_filename(domain, site, year)
+        out[(site, year)] = name
+    return out
 
 DOMAINS: dict[str, DomainConfig] = {
     "weather": DomainConfig(
@@ -200,13 +306,27 @@ def uav_spatial_csvs() -> list[Path]:
     return sorted(DATA_DIR.glob("uav_lidar_*.csv")) + sorted(DATA_DIR.glob("uav_gnss_*.csv"))
 
 
+def parquet_build_targets() -> list[tuple[str, Path, list[Path]]]:
+    """Consolidated Parquet targets: (name, output_path, source_csvs)."""
+    return [
+        ("fluorescence", SENSOR_PARQUET["fluorescence"], [TABLE_CSV["fluorescence"]]),
+        ("reflectance", SENSOR_PARQUET["reflectance"], [TABLE_CSV["reflectance"]]),
+        ("wp", SENSOR_PARQUET["wp"], [TABLE_CSV["wp"]]),
+        ("soil_moisture", SENSOR_PARQUET["soil_moisture"], [TABLE_CSV["soil_moisture"]]),
+        ("weather_eccc", SENSOR_PARQUET["weather_eccc"], list(WEATHER_CSV["eccc"].values())),
+        ("weather_eccc_hourly", SENSOR_PARQUET["weather_eccc_hourly"], list(WEATHER_CSV["eccc_hourly"].values())),
+        ("weather_daymet", SENSOR_PARQUET["weather_daymet"], list(WEATHER_CSV["daymet"].values())),
+        ("uav", SENSOR_PARQUET["uav"], list(UAV_CSV.values())),
+        ("lidar", SENSOR_PARQUET["lidar"], sorted(DATA_DIR.glob("uav_lidar_*.csv"))),
+        ("gnss", SENSOR_PARQUET["gnss"], sorted(DATA_DIR.glob("uav_gnss_*.csv"))),
+    ]
+
+
 def all_csv_sources() -> list[Path]:
-    """Every CSV export that has a corresponding Parquet query file."""
-    paths: list[Path] = list(TABLE_CSV.values())
-    for sites in WEATHER_CSV.values():
-        paths.extend(sites.values())
-    paths.extend(UAV_CSV.values())
-    paths.extend(uav_spatial_csvs())
+    """Every CSV export referenced by a consolidated Parquet target."""
+    paths: list[Path] = []
+    for _, _, csvs in parquet_build_targets():
+        paths.extend(csvs)
     return paths
 
 
@@ -230,17 +350,18 @@ def list_public_datasets() -> list[dict[str, Any]]:
         files = DOMAIN_FILES.get(domain_id)
         if domain_id == "weather":
             entry["sources"] = {
-                source: {site: path.name for site, path in sites.items()}
-                for source, sites in files.items()
+                source: {
+                    site: _weather_csv_name(source, site)
+                    for site in weather_sites_for_source(source)
+                }
+                for source in ("eccc", "eccc_hourly", "daymet")
             }
         elif domain_id == "uav":
             entry["years"] = {year: path.name for year, path in files.items()}
-        elif domain_id in UAV_SPATIAL:
+        elif domain_id in ("lidar", "gnss"):
             entry["files"] = {
-                f"{site}_{year}": parquet_for(
-                    DATA_DIR / f"uav_{domain_id}_{site.lower()}_{year}.csv"
-                ).name.replace(".parquet", ".csv")
-                for (site, year) in sorted(UAV_SPATIAL[domain_id])
+                f"{site}_{year}": name
+                for (site, year), name in sorted(spatial_catalog(domain_id).items())
             }
         elif files is not None and isinstance(files, Path):
             entry["file"] = files.name

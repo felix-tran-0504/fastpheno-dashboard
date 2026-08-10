@@ -14,8 +14,11 @@ YEAR_IN_PATH = re.compile(r"/(20\d{2})/")
 DATE_IN_PATH = re.compile(r"(20\d{2}-\d{2}-\d{2})")
 META_FIELDS = ["site", "year", "flight_date", "dataset", "source_file"]
 BAND_COLUMN = re.compile(r"^\d+nm$")
+from fastpheno_env import get_iii_db_root, load_env
+
+load_env()
 DEFAULT_SRC = Path(__file__).resolve().parents[1] / "uav-reflectance"
-FALLBACK_SRC = Path("/Users/felixtran/Downloads/III_db_final/UAV-Reflectance")
+FALLBACK_SRC = get_iii_db_root() / "UAV-Reflectance"
 DEFAULT_OUT = Path(__file__).resolve().parents[1] / "data" / "fastpheno"
 
 

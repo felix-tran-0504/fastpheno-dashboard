@@ -7,6 +7,25 @@ Daily weather records from Environment and Climate Change Canada (ECCC) stations
 - `PIK_daily_2010-2024.csv`
 - `PIN_daily_2010-2024.csv`
 
+## Source layout (III_db_final)
+
+The upstream Weather folder is organized by product and site:
+
+```text
+Weather/
+  ECCC/
+    PIK/Daily/PIK_daily_2010-2024.csv
+    PIK/Hourly/PIK_hourly_2022-2024.csv
+    PIN/Daily/…  PIN/Hourly/…
+    … (other station codes: CSI, FMM, GP, SCA, SM, TP39, TPD)
+  Daymet/
+    PIK/daily/PIK_daily.csv
+    PIN/daily/PIN_daily.csv
+    … (same station codes as ECCC)
+```
+
+The dashboard uses **all ECCC site exports** under `Weather/ECCC/` (currently CSI, FMM, GP, PIK, PIN, SCA, SM, TP39, TPD) plus matching Daymet daily files.
+
 ## CSV Columns
 
 | Column Name | Description |

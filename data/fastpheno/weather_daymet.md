@@ -7,6 +7,14 @@ Daily gridded meteorology from [Daymet v4](https://daymet.ornl.gov/) extracted a
 - `PIK_daymet_daily_2010-2024.csv`
 - `PIN_daymet_daily_2010-2024.csv`
 
+## Source layout (III_db_final)
+
+```text
+Weather/Daymet/{PIK,PIN}/daily/{site}_daily.csv
+```
+
+Additional Daymet site folders (CSI, FMM, GP, SCA, SM, TP39, TPD) are included alongside PIK and PIN in the dashboard build.
+
 ## CSV Columns
 
 | Column Name | Description |

@@ -14,7 +14,10 @@ SITE_MAP = {"Pickering": "PIK", "Pintendre": "PIN"}
 FLIGHT_FOLDER = re.compile(r"^(20\d{2}-\d{2}-\d{2}(?:_\d+)?)$")
 FLIGHT_DATE = re.compile(r"(20\d{2}-\d{2}-\d{2})")
 
-DEFAULT_SRC = Path("/Users/felixtran/Downloads/III_db_final/UAV-SpatialInformation")
+from fastpheno_env import get_iii_db_root, load_env
+
+load_env()
+DEFAULT_SRC = get_iii_db_root() / "UAV-SpatialInformation"
 DEFAULT_OUT = Path(__file__).resolve().parents[1] / "data" / "fastpheno"
 
 LIDAR_FILE = "treeSpatialMetrics.csv"

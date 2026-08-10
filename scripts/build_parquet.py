@@ -32,9 +32,9 @@ def main() -> int:
         missing = parquet_store.missing_parquet()
         stale = parquet_store.stale_parquet()
         if missing:
-            print("Missing Parquet:", ", ".join(p.name for p in missing))
+            print("Missing Parquet:", ", ".join(missing))
         if stale:
-            print("Stale Parquet:", ", ".join(p.name for p in stale))
+            print("Stale Parquet:", ", ".join(stale))
         return 1 if (missing or stale) else 0
 
     print(f"CSV source dir:  {datasets.DATA_DIR}")

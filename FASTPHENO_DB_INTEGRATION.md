@@ -12,7 +12,9 @@ The primary app is [`fastpheno-dashboard.html`](./fastpheno-dashboard.html), bac
 
 | Domain | Source path(s) | Browser-friendly? | Best viz types |
 |--------|----------------|-------------------|----------------|
-| **Weather** | `Weather/ECCC/{PIK,PIN}/Daily/*_daily_2010-2024.csv` | Yes — ~5.5k rows/site, ~20 cols | Time series (temp, precip, VPD), seasonal aggregates |
+| **Weather (ECCC daily)** | `Weather/ECCC/{PIK,PIN}/Daily/*_daily_2010-2024.csv` | Yes — ~5.5k rows/site | Time series (temp, precip, VPD) |
+| **Weather (Daymet daily)** | `Weather/Daymet/{PIK,PIN}/daily/*_daily.csv` | Yes — ~5.5k rows/site | Time series (temp, PAR, VPD) |
+| **Weather (hourly)** | `Weather/ECCC/{site}/Hourly/*_hourly_2022-2024.csv` | Not in dashboard yet | Future hourly views |
 | **Reflectance** | `Reflectance/{site}/{year}/UNS_*.csv` | Partial — raw campaign files are wide (hundreds of spectral cols) but still usable if filtered to key metrics in the UI | Time series, genotype boxplots |
 | **Fluorescence** | `Fluorescence/{site}/FLP_*.csv` | Yes — raw campaign rows are browser-friendly | Time series (QY_max, NPQ_Lss), scatter vs WP |
 | **Predawn WP** | `PredawnWaterPotential/Process/SPC_PreWP_2023.csv` | Yes — ~530 rows | Boxplot by cluster/genotype, scatter over season |

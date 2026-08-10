@@ -6,7 +6,10 @@ import re
 import shutil
 from pathlib import Path
 
-SRC = Path("/Users/felixtran/Downloads/III_db_final")
+from fastpheno_env import get_iii_db_root, load_env
+
+load_env()
+SRC = get_iii_db_root()
 OUT = Path(__file__).resolve().parents[1] / "data" / "fastpheno"
 SITE_MAP = {"Pintendre": "PIN", "Pickering": "PIK"}
 DATE_IN_NAME = re.compile(r"(20\d{2}-\d{2}-\d{2})")
@@ -53,10 +56,32 @@ def write_csv(path: Path, fieldnames, rows):
         writer.writerows(rows)
 
 
+def eccc_weather_sites():
+    root = SRC / "Weather" / "ECCC"
+    if not root.is_dir():
+        return []
+    return sorted(
+        path.name
+        for path in root.iterdir()
+        if path.is_dir() and (path / "Daily").is_dir()
+    )
+
+
 def copy_weather():
-    for site in ("PIK", "PIN"):
+    for site in eccc_weather_sites():
         src = SRC / "Weather" / "ECCC" / site / "Daily" / f"{site}_daily_2010-2024.csv"
         dst = OUT / f"{site}_daily_2010-2024.csv"
+        if not src.is_file():
+            raise FileNotFoundError(f"Missing ECCC daily export: {src}")
+        shutil.copy2(src, dst)
+
+
+def copy_eccc_hourly():
+    for site in eccc_weather_sites():
+        src = SRC / "Weather" / "ECCC" / site / "Hourly" / f"{site}_hourly_2022-2024.csv"
+        dst = OUT / f"{site}_hourly_2022-2024.csv"
+        if not src.is_file():
+            raise FileNotFoundError(f"Missing ECCC hourly export: {src}")
         shutil.copy2(src, dst)
 
 
@@ -71,8 +96,10 @@ def build_daymet_weather():
         "par_w_m2", "par_mol_m2_day", "srad_w_m2", "vp_Pa", "dayl_s",
         "temp",
     ]
-    for site in ("PIK", "PIN"):
+    for site in eccc_weather_sites():
         src = SRC / "Weather" / "Daymet" / site / "daily" / f"{site}_daily.csv"
+        if not src.is_file():
+            raise FileNotFoundError(f"Missing Daymet daily export: {src}")
         rows = []
         with src.open() as handle:
             for row in csv.DictReader(handle):
@@ -197,27 +224,64 @@ def build_reflectance():
     return rows
 
 
-def main():
+def build_weather():
     copy_weather()
+    copy_eccc_hourly()
     build_daymet_weather()
-    fluor = build_fluorescence()
-    refl = build_reflectance()
-    print(f"weather: PIK/PIN ECCC daily 2010-2024 copied")
-    print(f"weather: PIK/PIN Daymet daily 2010-2024 built")
-    print(f"fluorescence_indices.csv: {len(fluor)} rows")
-    print(f"reflectance_indices.csv: {len(refl)} rows")
-    build_parquet()
 
 
-def build_parquet():
+def build_parquet(*, force: bool = False, weather_only: bool = False):
     import sys
 
     root = Path(__file__).resolve().parents[1]
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
-    from backend.services.parquet_store import build_all
+    from backend.services.parquet_store import build_all, build_target
 
-    paths = build_all(force=True)
+    if weather_only:
+        from backend.services import datasets
+
+        paths = []
+        for name, out_path, csv_paths in datasets.parquet_build_targets():
+            if not name.startswith("weather_"):
+                continue
+            out = build_target(name, out_path, csv_paths, force=force)
+            if out is not None:
+                paths.append(out)
+        return paths
+
+    return build_all(force=force)
+
+
+def main():
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Build FastPheno CSV exports from III_db_final")
+    parser.add_argument(
+        "--weather-only",
+        action="store_true",
+        help="Refresh all ECCC daily + hourly and Daymet daily CSVs and Parquet only",
+    )
+    args = parser.parse_args()
+
+    if args.weather_only:
+        build_weather()
+        paths = build_parquet(force=True, weather_only=True)
+        print("weather: ECCC daily 2010-2024 copied for", ", ".join(eccc_weather_sites()))
+        print("weather: ECCC hourly 2022-2024 copied for", ", ".join(eccc_weather_sites()))
+        print("weather: Daymet daily 2010-2024 built for", ", ".join(eccc_weather_sites()))
+        print(f"parquet: {len(paths)} weather file(s) in data/fastpheno/parquet/")
+        return
+
+    build_weather()
+    fluor = build_fluorescence()
+    refl = build_reflectance()
+    print("weather: ECCC daily 2010-2024 copied for", ", ".join(eccc_weather_sites()))
+    print("weather: ECCC hourly 2022-2024 copied for", ", ".join(eccc_weather_sites()))
+    print("weather: Daymet daily 2010-2024 built for", ", ".join(eccc_weather_sites()))
+    print(f"fluorescence_indices.csv: {len(fluor)} rows")
+    print(f"reflectance_indices.csv: {len(refl)} rows")
+    paths = build_parquet(force=True)
     print(f"parquet: {len(paths)} file(s) in data/fastpheno/parquet/")
 
 

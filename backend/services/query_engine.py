@@ -74,6 +74,20 @@ def init_duckdb() -> None:
 _views_ready = False
 
 
+def _validate_weather_site(site: str | None) -> str | None:
+    if site is None:
+        return None
+    site = site.upper()
+    allowed = datasets.weather_sites()
+    if site not in allowed:
+        raise ValueError(f"site must be one of: {', '.join(allowed)}")
+    return site
+
+
+def _weather_sites_for_source(source: str) -> list[str]:
+    return datasets.weather_sites_for_source(source)
+
+
 def _validate_site(site: str | None) -> str | None:
     if site is None:
         return None
@@ -124,23 +138,20 @@ def _ensure_all_views() -> None:
             f"CREATE OR REPLACE VIEW {name} AS "
             f"SELECT * FROM {_parquet_source(path)}"
         )
-    for name, path in datasets.WEATHER_VIEWS.items():
+    for source, path in datasets.WEATHER_PARQUET.items():
         con.execute(
-            f"CREATE OR REPLACE VIEW {name} AS "
+            f"CREATE OR REPLACE VIEW weather_{source} AS "
             f"SELECT * FROM {_parquet_source(path)}"
         )
-    for year, path in datasets.UAV_DATASETS.items():
+    con.execute(
+        f"CREATE OR REPLACE VIEW uav AS "
+        f"SELECT * FROM {_parquet_source(datasets.UAV_PARQUET)}"
+    )
+    for spatial in ("lidar", "gnss"):
         con.execute(
-            f"CREATE OR REPLACE VIEW uav_{year} AS "
-            f"SELECT * FROM {_parquet_source(path)}"
+            f"CREATE OR REPLACE VIEW {spatial} AS "
+            f"SELECT * FROM {_parquet_source(datasets.SENSOR_PARQUET[spatial])}"
         )
-    for kind, site_years in datasets.UAV_SPATIAL.items():
-        for (site, year), path in site_years.items():
-            view = f"{kind}_{site.lower()}_{year}"
-            con.execute(
-                f"CREATE OR REPLACE VIEW {view} AS "
-                f"SELECT * FROM {_parquet_source(path)}"
-            )
     _views_ready = True
 
 
@@ -155,20 +166,19 @@ def _table_relation(domain: str) -> str:
     return domain
 
 
-def _weather_view_name(source: str, site: str) -> str:
-    return f"weather_{source.lower()}_{site.lower()}"
+def _weather_source_view(source: str) -> str:
+    return f"weather_{source.lower()}"
 
 
 def _weather_relation(source: str, site: str | None) -> str:
     _ensure_all_views()
-    src = source.lower()
+    view = _weather_source_view(source)
     if site:
-        return _weather_view_name(src, site)
-    parts = [
-        f"SELECT *, upper('{s}') AS site_id FROM {_weather_view_name(src, s)}"
-        for s in ("PIK", "PIN")
-    ]
-    return f"({' UNION ALL '.join(parts)})"
+        site = _validate_weather_site(site)
+        if not datasets.weather_has_site(source, site):
+            raise ValueError(f"no weather data for site {site} in source {source.lower()}")
+        return f"(SELECT * FROM {view} WHERE upper(cast(site_id as varchar)) = '{site}')"
+    return view
 
 
 def _describe_fields(relation: str) -> list[str]:
@@ -187,18 +197,16 @@ def _uav_years_in_range(date_from: str | None, date_to: str | None) -> list[int]
 
 def _uav_relation(years: list[int]) -> str:
     _ensure_uav_views()
-    if len(years) == 1:
-        return f"uav_{years[0]}"
-    parts = [f"SELECT * FROM uav_{y}" for y in years]
-    return f"({' UNION ALL '.join(parts)})"
+    all_years = sorted(datasets.UAV_DATASETS)
+    if years == all_years:
+        return "uav"
+    year_list = ", ".join(str(y) for y in years)
+    return f"(SELECT * FROM uav WHERE year IN ({year_list}))"
 
 
 def _uav_select_columns() -> str:
     return ", ".join(_quote_ident(c) for c in UAV_ROW_COLUMNS)
 
-
-def _spatial_view_name(domain: str, site: str, year: int) -> str:
-    return f"{domain}_{site.lower()}_{year}"
 
 
 def _spatial_years_for_site(
@@ -208,9 +216,7 @@ def _spatial_years_for_site(
     date_to: str | None,
 ) -> list[int]:
     site = site.upper()
-    available = sorted(y for (s, y) in datasets.UAV_SPATIAL.get(domain, {}) if s == site)
-    if not available:
-        raise FileNotFoundError(f"no {domain} data for site {site}")
+    available = datasets.spatial_years_for_site(domain, site)
     if not date_from and not date_to:
         return available
     lo_year = int((date_from or date_to)[:4])
@@ -223,10 +229,12 @@ def _spatial_years_for_site(
 
 def _spatial_relation(domain: str, site: str, years: list[int]) -> str:
     _ensure_all_views()
-    if len(years) == 1:
-        return _spatial_view_name(domain, site, years[0])
-    parts = [f"SELECT * FROM {_spatial_view_name(domain, site, y)}" for y in years]
-    return f"({' UNION ALL '.join(parts)})"
+    site = site.upper()
+    year_list = ", ".join(str(y) for y in years)
+    return (
+        f"(SELECT * FROM {domain} "
+        f"WHERE upper(cast(site as varchar)) = '{site}' AND year IN ({year_list}))"
+    )
 
 
 def _spatial_select_columns(domain: str) -> str:
@@ -245,35 +253,33 @@ def _build_spatial_meta(domain: str, *, site: str) -> dict[str, Any]:
     years = _spatial_years_for_site(domain, site, None, None)
     years_meta: dict[str, Any] = {}
     for y in years:
-        relation = _spatial_view_name(domain, site, y)
         row = _fetch_one(
             f"""
             SELECT
                 min({_date_expr(cfg.date_field)}) AS min_date,
                 max({_date_expr(cfg.date_field)}) AS max_date,
                 count(*) AS row_count
-            FROM {relation}
-            WHERE {_date_expr(cfg.date_field)} IS NOT NULL
-            """
+            FROM {domain}
+            WHERE upper(cast(site as varchar)) = ?
+              AND year = ?
+              AND {_date_expr(cfg.date_field)} IS NOT NULL
+            """,
+            [site, y],
         )
-        csv_name = datasets.DATA_DIR / f"uav_{domain}_{site.lower()}_{y}.csv"
-        years_meta[str(y)] = {"bounds": row, "file": csv_name.name}
+        csv_name = datasets.spatial_export_filename(domain, site, y)
+        years_meta[str(y)] = {"bounds": row, "file": csv_name}
     bounds = _fetch_one(
         f"""
         SELECT
-            min(min_date) AS min_date,
-            max(max_date) AS max_date,
-            sum(row_count) AS row_count
-        FROM (
-            {" UNION ALL ".join(
-                f"SELECT min({_date_expr(cfg.date_field)}) AS min_date, "
-                f"max({_date_expr(cfg.date_field)}) AS max_date, count(*) AS row_count "
-                f"FROM {_spatial_view_name(domain, site, y)} "
-                f"WHERE {_date_expr(cfg.date_field)} IS NOT NULL"
-                for y in years
-            )}
-        ) t
-        """
+            min({_date_expr(cfg.date_field)}) AS min_date,
+            max({_date_expr(cfg.date_field)}) AS max_date,
+            count(*) AS row_count
+        FROM {domain}
+        WHERE upper(cast(site as varchar)) = ?
+          AND year IN ({", ".join(str(y) for y in years)})
+          AND {_date_expr(cfg.date_field)} IS NOT NULL
+        """,
+        [site],
     )
     relation = _spatial_relation(domain, site, years)
     dates = _fetch_dicts(
@@ -381,33 +387,31 @@ def _build_uav_meta(*, site: str | None = None) -> dict[str, Any]:
                 min({_date_expr(cfg.date_field)}) AS min_date,
                 max({_date_expr(cfg.date_field)}) AS max_date,
                 count(*) AS row_count
-            FROM uav_{y}
-            WHERE {_date_expr(cfg.date_field)} IS NOT NULL
-            """
+            FROM uav
+            WHERE year = ?
+              AND {_date_expr(cfg.date_field)} IS NOT NULL
+            """,
+            [y],
         )
         sites = _fetch_dicts(
             f"""
             SELECT upper(cast({cfg.site_field} as varchar)) AS site, count(*) AS n
-            FROM uav_{y}
+            FROM uav
+            WHERE year = ?
             GROUP BY 1 ORDER BY 1
-            """
+            """,
+            [y],
         )
         years_meta[str(y)] = {"bounds": row, "sites": sites, "file": datasets.UAV_CSV[y].name}
 
     bounds = _fetch_one(
         f"""
         SELECT
-            min(min_date) AS min_date,
-            max(max_date) AS max_date,
-            sum(row_count) AS row_count
-        FROM (
-            {" UNION ALL ".join(
-                f"SELECT min({_date_expr(cfg.date_field)}) AS min_date, "
-                f"max({_date_expr(cfg.date_field)}) AS max_date, count(*) AS row_count "
-                f"FROM uav_{y} WHERE {_date_expr(cfg.date_field)} IS NOT NULL"
-                for y in years
-            )}
-        ) t
+            min({_date_expr(cfg.date_field)}) AS min_date,
+            max({_date_expr(cfg.date_field)}) AS max_date,
+            count(*) AS row_count
+        FROM uav
+        WHERE {_date_expr(cfg.date_field)} IS NOT NULL
         """
     )
     result: dict[str, Any] = {
@@ -419,18 +423,15 @@ def _build_uav_meta(*, site: str | None = None) -> dict[str, Any]:
         "bounds": bounds,
     }
     if site:
-        union = " UNION ALL ".join(
+        dates = _fetch_dicts(
             f"""
-            SELECT cast({_date_expr(cfg.date_field)} as varchar) AS date
-            FROM uav_{y}
+            SELECT DISTINCT cast({_date_expr(cfg.date_field)} as varchar) AS date
+            FROM uav
             WHERE upper(cast({cfg.site_field} as varchar)) = ?
               AND {_date_expr(cfg.date_field)} IS NOT NULL
-            """
-            for y in years
-        )
-        dates = _fetch_dicts(
-            f"SELECT DISTINCT date FROM ({union}) t ORDER BY 1",
-            [site] * len(years),
+            ORDER BY 1
+            """,
+            [site],
         )
         result["flight_dates"] = [r["date"] for r in dates]
     return result
@@ -568,16 +569,35 @@ def _table_max_rows(domain: str) -> int:
     return config.CAMPAIGN_MAX_TABLE_ROWS
 
 
+def _resolve_weather_source(source: str, resolution: str | None = None) -> str:
+    src = source.lower()
+    res = (resolution or "daily").lower()
+    if res not in datasets.WEATHER_RESOLUTIONS:
+        raise ValueError("resolution must be daily or hourly")
+    if src == "daymet":
+        if res == "hourly":
+            raise ValueError("hourly resolution is only available for ECCC")
+        return "daymet"
+    if src in ("eccc", "eccc_hourly"):
+        return "eccc_hourly" if res == "hourly" else "eccc"
+    if src in ("eccc", "eccc_hourly", "daymet"):
+        return src
+    raise ValueError("source must be eccc or daymet")
+
+
 def _resolve_weather_path(source: str, site: str) -> Path:
     source = source.lower()
-    if source not in datasets.WEATHER_SOURCES:
-        raise ValueError("source must be eccc or daymet")
-    site = _validate_site(site) or "PIN"
-    return datasets.WEATHER_SOURCES[source][site]
+    if source not in ("eccc", "eccc_hourly", "daymet"):
+        raise ValueError("source must be eccc, eccc_hourly, or daymet")
+    sites = datasets.weather_sites()
+    site = _validate_weather_site(site) or (sites[0] if sites else "PIN")
+    filename = datasets.weather_csv_name(source, site)
+    return datasets.DATA_DIR / filename
 
 
 def _resolve_domain_path(domain: str, *, source: str | None = None, site: str | None = None, year: int | None = None) -> Path:
     if domain == "weather":
+        site = _validate_weather_site(site)
         if not source:
             raise ValueError("source is required for weather queries")
         if not site:
@@ -600,19 +620,28 @@ def get_domain_meta(
     domain: str,
     *,
     source: str | None = None,
+    resolution: str | None = None,
     site: str | None = None,
     year: int | None = None,
 ) -> dict[str, Any]:
     cfg = datasets.domain_config(domain)
-    site = _validate_site(site)
+    if domain == "weather":
+        site = _validate_weather_site(site)
+    else:
+        site = _validate_site(site)
 
     if domain == "weather":
         bounds: dict[str, Any] = {}
-        sites_out = ["PIK", "PIN"] if site is None else [site]
-        sources_out = ["eccc", "daymet"] if source is None else [source.lower()]
+        all_sites = datasets.weather_sites()
+        sites_out = all_sites if site is None else [site]
+        if source is None:
+            sources_out = ["eccc", "eccc_hourly", "daymet"]
+        else:
+            sources_out = [_resolve_weather_source(source, resolution)]
         for src in sources_out:
             bounds[src] = {}
-            for s in sites_out:
+            src_sites = [s for s in sites_out if datasets.weather_has_site(src, s)]
+            for s in src_sites:
                 relation = _weather_relation(src, s)
                 row = _fetch_one(
                     f"""
@@ -628,13 +657,18 @@ def get_domain_meta(
         result: dict[str, Any] = {
             "domain": domain,
             "sources": ["eccc", "daymet"],
-            "sites": ["PIK", "PIN"],
+            "resolutions": {"eccc": ["daily", "hourly"], "daymet": ["daily"]},
+            "sites": all_sites,
             "metrics": datasets.WEATHER_METRICS,
             "bounds": bounds,
             "metadata_file": cfg.metadata_file,
         }
         if source:
-            src = source.lower()
+            src = _resolve_weather_source(source, resolution)
+            res = (resolution or "daily").lower()
+            result["source"] = source.lower()
+            result["resolution"] = res
+            src_sites = _weather_sites_for_source(src)
             if site:
                 relation = _weather_relation(src, site)
                 dates = _fetch_dicts(
@@ -648,17 +682,17 @@ def get_domain_meta(
                 result["available_dates"] = [r["date"] for r in dates]
                 result["fields"] = _describe_fields(relation)
             else:
-                union = " UNION ALL ".join(
+                relation = _weather_relation(src, None)
+                dates = _fetch_dicts(
                     f"""
-                    SELECT cast({_date_expr(cfg.date_field)} as varchar) AS date
-                    FROM {_weather_view_name(src, s)}
+                    SELECT DISTINCT cast({_date_expr(cfg.date_field)} as varchar) AS date
+                    FROM {relation}
                     WHERE {_date_expr(cfg.date_field)} IS NOT NULL
+                    ORDER BY 1
                     """
-                    for s in ("PIK", "PIN")
                 )
-                dates = _fetch_dicts(f"SELECT DISTINCT date FROM ({union}) t ORDER BY 1")
                 result["available_dates"] = [r["date"] for r in dates]
-                result["fields"] = _describe_fields(_weather_view_name(src, "PIK"))
+                result["fields"] = _describe_fields(_weather_source_view(src))
         return result
 
     if domain == "uav":
@@ -674,16 +708,20 @@ def get_domain_meta(
                     min({_date_expr(cfg.date_field)}) AS min_date,
                     max({_date_expr(cfg.date_field)}) AS max_date,
                     count(*) AS row_count
-                FROM uav_{y}
-                WHERE {_date_expr(cfg.date_field)} IS NOT NULL
-                """
+                FROM uav
+                WHERE year = ?
+                  AND {_date_expr(cfg.date_field)} IS NOT NULL
+                """,
+                [y],
             )
             sites = _fetch_dicts(
                 f"""
                 SELECT upper(cast({cfg.site_field} as varchar)) AS site, count(*) AS n
-                FROM uav_{y}
+                FROM uav
+                WHERE year = ?
                 GROUP BY 1 ORDER BY 1
-                """
+                """,
+                [y],
             )
             years_meta[str(y)] = {"bounds": row, "sites": sites, "file": path.name}
             result: dict[str, Any] = {
@@ -698,12 +736,13 @@ def get_domain_meta(
                 dates = _fetch_dicts(
                     f"""
                     SELECT DISTINCT cast({_date_expr(cfg.date_field)} as varchar) AS date
-                    FROM uav_{y}
-                    WHERE upper(cast({cfg.site_field} as varchar)) = ?
+                    FROM uav
+                    WHERE year = ?
+                      AND upper(cast({cfg.site_field} as varchar)) = ?
                       AND {_date_expr(cfg.date_field)} IS NOT NULL
                     ORDER BY 1
                     """,
-                    [site],
+                    [y, site],
                 )
                 result["flight_dates"] = [r["date"] for r in dates]
             return result
@@ -728,6 +767,7 @@ def get_daily_series(
     metric: str,
     *,
     source: str | None = None,
+    resolution: str | None = None,
     site: str | None = None,
     year: int | None = None,
     sensor_id: str | None = None,
@@ -742,21 +782,39 @@ def get_daily_series(
         site = _validate_site(site)
 
     if domain == "weather":
+        site = _validate_weather_site(site)
         if not source:
             raise ValueError("source is required")
-        allowed = datasets.WEATHER_METRICS.get(source.lower(), [])
+        resolved = _resolve_weather_source(source, resolution)
+        allowed = datasets.WEATHER_METRICS.get(resolved, [])
         metric = _validate_metric(metric, allowed)
-        relation = _weather_relation(source, site)
+        relation = _weather_relation(resolved, site)
         where, params = _build_filters(cfg.date_field, cfg.site_field, site=None, date_from=date_from, date_to=date_to)
-        sql = f"""
-            SELECT cast({_date_expr(cfg.date_field)} as varchar) AS date,
-                   try_cast({_quote_ident(metric)} as double) AS mean,
-                   1 AS n
-            FROM {relation}{where}
-            ORDER BY date
-        """
+        if resolved == "eccc_hourly":
+            sql = f"""
+                SELECT cast(concat({_date_expr(cfg.date_field)}, ' ', substr(cast(time as varchar), 12, 8)) as varchar) AS date,
+                       try_cast({_quote_ident(metric)} as double) AS mean,
+                       1 AS n
+                FROM {relation}{where}
+                ORDER BY {_date_expr(cfg.date_field)}, time
+            """
+        else:
+            sql = f"""
+                SELECT cast({_date_expr(cfg.date_field)} as varchar) AS date,
+                       try_cast({_quote_ident(metric)} as double) AS mean,
+                       1 AS n
+                FROM {relation}{where}
+                ORDER BY date
+            """
         points = _fetch_dicts(sql, params)
-        return {"domain": domain, "metric": metric, "source": source.lower(), "site": site, "points": points}
+        return {
+            "domain": domain,
+            "metric": metric,
+            "source": source.lower(),
+            "resolution": (resolution or "daily").lower(),
+            "site": site,
+            "points": points,
+        }
 
     if domain == "soil_moisture":
         return _get_soil_moisture_series(
@@ -827,6 +885,7 @@ def get_rows(
     domain: str,
     *,
     source: str | None = None,
+    resolution: str | None = None,
     site: str | None = None,
     year: int | None = None,
     sensor_id: str | None = None,
@@ -844,11 +903,13 @@ def get_rows(
     offset = (page - 1) * page_size
 
     if domain == "weather":
+        site = _validate_weather_site(site)
         if not source:
             raise ValueError("source is required")
-        relation = _weather_relation(source, site)
+        resolved = _resolve_weather_source(source, resolution)
+        relation = _weather_relation(resolved, site)
         where, params = _build_filters(cfg.date_field, cfg.site_field, site=None, date_from=date_from, date_to=date_to)
-        order_by = cfg.date_field
+        order_by = f"{cfg.date_field}, time" if resolved == "eccc_hourly" else cfg.date_field
         max_rows = config.CAMPAIGN_MAX_TABLE_ROWS
     elif domain == "uav":
         years = [year] if year is not None else _uav_years_in_range(date_from, date_to)
