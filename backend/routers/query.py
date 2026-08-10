@@ -46,6 +46,8 @@ def domain_daily(
     year: int | None = Query(None, description="UAV year"),
     date_from: str | None = Query(None, alias="from"),
     date_to: str | None = Query(None, alias="to"),
+    sensor_id: str | None = Query(None, description="Soil moisture sensor ID (e.g. b11)"),
+    interval: str | None = Query(None, description="Soil moisture aggregation: hourly, daily, weekly, monthly"),
 ):
     try:
         return query_engine.get_daily_series(
@@ -54,6 +56,8 @@ def domain_daily(
             source=source,
             site=site,
             year=year,
+            sensor_id=sensor_id,
+            interval=interval,
             date_from=date_from,
             date_to=date_to,
         )
@@ -69,6 +73,7 @@ def domain_rows(
     year: int | None = Query(None, description="UAV year"),
     date_from: str | None = Query(None, alias="from"),
     date_to: str | None = Query(None, alias="to"),
+    sensor_id: str | None = Query(None, description="Soil moisture sensor ID (e.g. b11)"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
     all_rows: bool = Query(False, alias="all"),
@@ -81,6 +86,7 @@ def domain_rows(
             year=year,
             date_from=date_from,
             date_to=date_to,
+            sensor_id=sensor_id,
             page=page,
             page_size=page_size,
             all_rows=all_rows,

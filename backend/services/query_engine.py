@@ -31,6 +31,37 @@ UAV_ROW_COLUMNS = [
     "WaterIndex_mean",
 ]
 
+LIDAR_ROW_COLUMNS = [
+    "site",
+    "year",
+    "flight_date",
+    "flight_id",
+    "source_file",
+    "site_treeid",
+    "tree_height_corrected_m",
+    "canopy_area_m2",
+    "tree_altitude_m",
+]
+
+GNSS_ROW_COLUMNS = [
+    "site",
+    "year",
+    "flight_date",
+    "flight_id",
+    "source_file",
+    "site_treeid",
+    "treeTop_x",
+    "treeTop_y",
+    "treeTop_x_std",
+    "treeTop_y_std",
+]
+
+SPATIAL_DOMAINS = {"lidar", "gnss"}
+SPATIAL_ROW_COLUMNS = {
+    "lidar": LIDAR_ROW_COLUMNS,
+    "gnss": GNSS_ROW_COLUMNS,
+}
+
 def warm_query_cache() -> None:
     """Pre-register DuckDB views so first user request is not cold."""
     _ensure_all_views()
@@ -103,6 +134,13 @@ def _ensure_all_views() -> None:
             f"CREATE OR REPLACE VIEW uav_{year} AS "
             f"SELECT * FROM {_parquet_source(path)}"
         )
+    for kind, site_years in datasets.UAV_SPATIAL.items():
+        for (site, year), path in site_years.items():
+            view = f"{kind}_{site.lower()}_{year}"
+            con.execute(
+                f"CREATE OR REPLACE VIEW {view} AS "
+                f"SELECT * FROM {_parquet_source(path)}"
+            )
     _views_ready = True
 
 
@@ -159,6 +197,105 @@ def _uav_select_columns() -> str:
     return ", ".join(_quote_ident(c) for c in UAV_ROW_COLUMNS)
 
 
+def _spatial_view_name(domain: str, site: str, year: int) -> str:
+    return f"{domain}_{site.lower()}_{year}"
+
+
+def _spatial_years_for_site(
+    domain: str,
+    site: str,
+    date_from: str | None,
+    date_to: str | None,
+) -> list[int]:
+    site = site.upper()
+    available = sorted(y for (s, y) in datasets.UAV_SPATIAL.get(domain, {}) if s == site)
+    if not available:
+        raise FileNotFoundError(f"no {domain} data for site {site}")
+    if not date_from and not date_to:
+        return available
+    lo_year = int((date_from or date_to)[:4])
+    hi_year = int((date_to or date_from)[:4])
+    years = [y for y in available if lo_year <= y <= hi_year]
+    if not years:
+        raise ValueError(f"no {domain} data for site {site} in date range")
+    return years
+
+
+def _spatial_relation(domain: str, site: str, years: list[int]) -> str:
+    _ensure_all_views()
+    if len(years) == 1:
+        return _spatial_view_name(domain, site, years[0])
+    parts = [f"SELECT * FROM {_spatial_view_name(domain, site, y)}" for y in years]
+    return f"({' UNION ALL '.join(parts)})"
+
+
+def _spatial_select_columns(domain: str) -> str:
+    return ", ".join(_quote_ident(c) for c in SPATIAL_ROW_COLUMNS[domain])
+
+
+@lru_cache(maxsize=16)
+def _cached_spatial_meta(domain: str, site: str) -> dict[str, Any]:
+    return _build_spatial_meta(domain, site=site)
+
+
+def _build_spatial_meta(domain: str, *, site: str) -> dict[str, Any]:
+    _ensure_all_views()
+    cfg = datasets.domain_config(domain)
+    site = _validate_site(site) or "PIN"
+    years = _spatial_years_for_site(domain, site, None, None)
+    years_meta: dict[str, Any] = {}
+    for y in years:
+        relation = _spatial_view_name(domain, site, y)
+        row = _fetch_one(
+            f"""
+            SELECT
+                min({_date_expr(cfg.date_field)}) AS min_date,
+                max({_date_expr(cfg.date_field)}) AS max_date,
+                count(*) AS row_count
+            FROM {relation}
+            WHERE {_date_expr(cfg.date_field)} IS NOT NULL
+            """
+        )
+        csv_name = datasets.DATA_DIR / f"uav_{domain}_{site.lower()}_{y}.csv"
+        years_meta[str(y)] = {"bounds": row, "file": csv_name.name}
+    bounds = _fetch_one(
+        f"""
+        SELECT
+            min(min_date) AS min_date,
+            max(max_date) AS max_date,
+            sum(row_count) AS row_count
+        FROM (
+            {" UNION ALL ".join(
+                f"SELECT min({_date_expr(cfg.date_field)}) AS min_date, "
+                f"max({_date_expr(cfg.date_field)}) AS max_date, count(*) AS row_count "
+                f"FROM {_spatial_view_name(domain, site, y)} "
+                f"WHERE {_date_expr(cfg.date_field)} IS NOT NULL"
+                for y in years
+            )}
+        ) t
+        """
+    )
+    relation = _spatial_relation(domain, site, years)
+    dates = _fetch_dicts(
+        f"""
+        SELECT DISTINCT cast({_date_expr(cfg.date_field)} as varchar) AS date
+        FROM {relation}
+        WHERE {_date_expr(cfg.date_field)} IS NOT NULL
+        ORDER BY 1
+        """
+    )
+    return {
+        "domain": domain,
+        "years": years,
+        "sites": ["PIK", "PIN"],
+        "metrics": cfg.default_metrics,
+        "years_meta": years_meta,
+        "bounds": bounds,
+        "flight_dates": [r["date"] for r in dates],
+        "fields": SPATIAL_ROW_COLUMNS[domain],
+    }
+
+
 @lru_cache(maxsize=16)
 def _cached_campaign_meta(domain: str, site: str | None) -> dict[str, Any]:
     return _build_campaign_meta(domain, site=site)
@@ -210,6 +347,20 @@ def _build_campaign_meta(domain: str, *, site: str | None = None) -> dict[str, A
         date_params,
     )
     result["available_dates"] = [r["date"] for r in dates]
+    if domain == "soil_moisture" and "sensor_id" in result["fields"]:
+        sensor_where = date_where
+        sensor_params = list(date_params)
+        sensors = _fetch_dicts(
+            f"""
+            SELECT DISTINCT cast(sensor_id as varchar) AS sensor_id
+            FROM {relation}
+            {sensor_where}
+              AND sensor_id IS NOT NULL AND cast(sensor_id as varchar) != ''
+            ORDER BY 1
+            """,
+            sensor_params,
+        )
+        result["sensor_ids"] = [r["sensor_id"] for r in sensors]
     return result
 
 
@@ -331,6 +482,90 @@ def _build_filters(
             params.append(str(value))
     where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
     return where, params
+
+
+SOIL_MOISTURE_INTERVALS = {"hourly", "daily", "weekly", "monthly"}
+
+
+def _validate_soil_interval(interval: str | None) -> str:
+    value = (interval or "daily").lower()
+    if value not in SOIL_MOISTURE_INTERVALS:
+        raise ValueError("interval must be hourly, daily, weekly, or monthly")
+    return value
+
+
+def _validate_soil_sensor_id(sensor_id: str | None) -> str:
+    if not sensor_id or not str(sensor_id).strip():
+        raise ValueError("sensor_id is required for soil moisture queries")
+    sensor_id = str(sensor_id).strip()
+    if not re.match(r"^[A-Za-z0-9_-]+$", sensor_id):
+        raise ValueError("invalid sensor_id")
+    return sensor_id
+
+
+def _soil_bucket_expr(interval: str) -> str:
+    if interval == "hourly":
+        return "date_trunc('hour', try_cast(datetime as timestamp))"
+    if interval == "daily":
+        return "try_cast(date as date)"
+    if interval == "weekly":
+        return "date_trunc('week', try_cast(date as date))"
+    return "date_trunc('month', try_cast(date as date))"
+
+
+def _filter_extra(domain: str, sensor_id: str | None) -> dict[str, Any] | None:
+    if domain == "soil_moisture" and sensor_id:
+        return {"sensor_id": _validate_soil_sensor_id(sensor_id)}
+    return None
+
+
+def _get_soil_moisture_series(
+    metric: str,
+    *,
+    site: str | None,
+    sensor_id: str | None,
+    interval: str | None,
+    date_from: str | None,
+    date_to: str | None,
+) -> dict[str, Any]:
+    cfg = datasets.domain_config("soil_moisture")
+    metric = _validate_metric(metric, cfg.default_metrics)
+    sensor_id = _validate_soil_sensor_id(sensor_id)
+    interval = _validate_soil_interval(interval)
+    site = _validate_site(site)
+    relation = _table_relation("soil_moisture")
+    bucket = _soil_bucket_expr(interval)
+    where, params = _build_filters(
+        cfg.date_field,
+        cfg.site_field,
+        site=site,
+        date_from=date_from,
+        date_to=date_to,
+        extra={"sensor_id": sensor_id},
+    )
+    sql = f"""
+        SELECT cast({bucket} as varchar) AS date,
+               avg(try_cast({_quote_ident(metric)} as double)) AS mean,
+               count(*) AS n
+        FROM {relation}{where}
+        GROUP BY {bucket}
+        ORDER BY {bucket}
+    """
+    points = _fetch_dicts(sql, params)
+    return {
+        "domain": "soil_moisture",
+        "metric": metric,
+        "site": site,
+        "sensor_id": sensor_id,
+        "interval": interval,
+        "points": points,
+    }
+
+
+def _table_max_rows(domain: str) -> int:
+    if domain == "soil_moisture":
+        return config.SOIL_MOISTURE_MAX_TABLE_ROWS
+    return config.CAMPAIGN_MAX_TABLE_ROWS
 
 
 def _resolve_weather_path(source: str, site: str) -> Path:
@@ -476,6 +711,10 @@ def get_domain_meta(
             return _cached_uav_meta(site)
         return _build_uav_meta(site=None)
 
+    if domain in SPATIAL_DOMAINS:
+        site = _validate_site(site) or "PIN"
+        return _cached_spatial_meta(domain, site)
+
     if domain in datasets.TABLE_DOMAINS:
         if site:
             return _cached_campaign_meta(domain, site)
@@ -491,6 +730,8 @@ def get_daily_series(
     source: str | None = None,
     site: str | None = None,
     year: int | None = None,
+    sensor_id: str | None = None,
+    interval: str | None = None,
     date_from: str | None = None,
     date_to: str | None = None,
 ) -> dict[str, Any]:
@@ -517,10 +758,23 @@ def get_daily_series(
         points = _fetch_dicts(sql, params)
         return {"domain": domain, "metric": metric, "source": source.lower(), "site": site, "points": points}
 
+    if domain == "soil_moisture":
+        return _get_soil_moisture_series(
+            metric,
+            site=site,
+            sensor_id=sensor_id,
+            interval=interval,
+            date_from=date_from,
+            date_to=date_to,
+        )
+
     if domain in datasets.TABLE_DOMAINS:
         metric = _validate_metric(metric, cfg.default_metrics)
         relation = _table_relation(domain)
-        where, params = _build_filters(cfg.date_field, cfg.site_field, site=site, date_from=date_from, date_to=date_to)
+        extra = _filter_extra(domain, sensor_id)
+        where, params = _build_filters(
+            cfg.date_field, cfg.site_field, site=site, date_from=date_from, date_to=date_to, extra=extra
+        )
         sql = f"""
             SELECT cast({_date_expr(cfg.date_field)} as varchar) AS date,
                    avg(try_cast({_quote_ident(metric)} as double)) AS mean,
@@ -530,7 +784,7 @@ def get_daily_series(
             ORDER BY 1
         """
         points = _fetch_dicts(sql, params)
-        return {"domain": domain, "metric": metric, "site": site, "points": points}
+        return {"domain": domain, "metric": metric, "site": site, "sensor_id": sensor_id, "points": points}
 
     if domain == "uav":
         metric = _validate_metric(metric, datasets.UAV_METRICS)
@@ -548,6 +802,24 @@ def get_daily_series(
         points = _fetch_dicts(sql, params)
         return {"domain": domain, "metric": metric, "site": site, "year": year, "points": points}
 
+    if domain in SPATIAL_DOMAINS:
+        cfg = datasets.domain_config(domain)
+        metric = _validate_metric(metric, cfg.default_metrics)
+        site = _validate_site(site) or "PIN"
+        years = _spatial_years_for_site(domain, site, date_from, date_to)
+        relation = _spatial_relation(domain, site, years)
+        where, params = _build_filters(cfg.date_field, cfg.site_field, site=site, date_from=date_from, date_to=date_to)
+        sql = f"""
+            SELECT cast({_date_expr(cfg.date_field)} as varchar) AS date,
+                   avg(try_cast({_quote_ident(metric)} as double)) AS mean,
+                   count(*) AS n
+            FROM {relation}{where}
+            GROUP BY 1
+            ORDER BY 1
+        """
+        points = _fetch_dicts(sql, params)
+        return {"domain": domain, "metric": metric, "site": site, "points": points}
+
     raise KeyError(domain)
 
 
@@ -557,6 +829,7 @@ def get_rows(
     source: str | None = None,
     site: str | None = None,
     year: int | None = None,
+    sensor_id: str | None = None,
     date_from: str | None = None,
     date_to: str | None = None,
     page: int = 1,
@@ -611,12 +884,51 @@ def get_rows(
             "site": site,
             "year": year,
         }
+    elif domain in SPATIAL_DOMAINS:
+        site = _validate_site(site) or "PIN"
+        years = _spatial_years_for_site(domain, site, date_from, date_to)
+        relation = _spatial_relation(domain, site, years)
+        where, params = _build_filters(cfg.date_field, cfg.site_field, site=site, date_from=date_from, date_to=date_to)
+        cols = _spatial_select_columns(domain)
+        order_by = f"{cfg.date_field}, site_treeid"
+        max_rows = config.UAV_MAX_TABLE_ROWS
+        total_row = _fetch_one(f"SELECT count(*) AS total FROM {relation}{where}", params)
+        total = int(total_row["total"]) if total_row else 0
+        if all_rows:
+            if total > max_rows:
+                raise ValueError(f"too many rows ({total}); narrow the date range (max {max_rows})")
+            rows = _fetch_dicts(
+                f"SELECT {cols} FROM {relation}{where} ORDER BY {order_by}",
+                params,
+            )
+            page_size = total or 1
+            page = 1
+        else:
+            rows = _fetch_dicts(
+                f"SELECT {cols} FROM {relation}{where} ORDER BY {order_by} LIMIT ? OFFSET ?",
+                [*params, page_size, offset],
+            )
+        return {
+            "domain": domain,
+            "rows": rows,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "source": None,
+            "site": site,
+            "year": year,
+        }
     elif domain in datasets.TABLE_DOMAINS:
         site = _validate_site(site)
+        if domain == "soil_moisture":
+            sensor_id = _validate_soil_sensor_id(sensor_id)
         relation = _table_relation(domain)
-        where, params = _build_filters(cfg.date_field, cfg.site_field, site=site, date_from=date_from, date_to=date_to)
-        order_by = cfg.date_field
-        max_rows = config.CAMPAIGN_MAX_TABLE_ROWS
+        extra = _filter_extra(domain, sensor_id)
+        where, params = _build_filters(
+            cfg.date_field, cfg.site_field, site=site, date_from=date_from, date_to=date_to, extra=extra
+        )
+        order_by = f"{cfg.date_field}, sensor_id, time" if domain == "soil_moisture" else cfg.date_field
+        max_rows = _table_max_rows(domain)
     else:
         raise KeyError(domain)
 
@@ -645,4 +957,5 @@ def get_rows(
         "source": source.lower() if source else None,
         "site": site,
         "year": year,
+        "sensor_id": sensor_id,
     }

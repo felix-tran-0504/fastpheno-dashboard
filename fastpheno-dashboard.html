@@ -93,13 +93,13 @@
     #fluorescence-table.data-table,
     #reflectance-table.data-table,
     #summary-table.data-table,
-    #uav-table.data-table { overflow-x: auto; max-width: 100%; }
+    #uav-table.data-table, #lidar-table.data-table, #gnss-table.data-table { overflow-x: auto; max-width: 100%; }
     .tabulator .tabulator-tableholder { background: #fff; }
     .tabulator .tabulator-table { min-width: 100%; }
     #weather-table.tabulator,
     #fluorescence-table.tabulator,
     #reflectance-table.tabulator,
-    #uav-table.tabulator { min-width: 100%; }
+    #uav-table.tabulator, #lidar-table.tabulator, #gnss-table.tabulator { min-width: 100%; }
     .data-table-footer {
       display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin: 8px 0 12px;
     }
@@ -119,6 +119,14 @@
     .metadata-panel table { border-collapse: collapse; width: 100%; margin: 6px 0; font-size: 8pt; }
     .metadata-panel th, .metadata-panel td { border: 1px solid #ccc; padding: 3px 6px; text-align: left; vertical-align: top; }
     .metadata-panel th { background: #eee; }
+    .pigments-panel { margin: 12px 0 16px; padding: 14px 16px; background: #fafafa; border: 1px solid #ddd; }
+    .pigments-panel h3 { margin: 0 0 10px; font-size: 11pt; color: #336633; }
+    .pigments-campaign-list { margin: 0; padding: 0; list-style: none; font-size: 10pt; }
+    .pigments-campaign-list li { padding: 6px 0; border-bottom: 1px solid #eee; }
+    .pigments-campaign-list li:last-child { border-bottom: none; }
+    .pigments-campaign-list .camp-label { font-weight: bold; color: #333; }
+    .pigments-campaign-list .camp-meta { color: #666; font-size: 9pt; }
+    .pigments-actions { margin: 14px 0 8px; }
     .sensor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin: 16px 0 24px; }
     .sensor-card {
       display: block; width: 100%; text-align: left; padding: 16px 18px;
@@ -413,13 +421,6 @@
           <button type="button" class="btn" id="wp-clear-series" disabled>Clear</button>
         </div>
       </div>
-      <div id="uav-site-control" class="is-hidden">
-        <label for="uav-site">Site</label>
-        <select id="uav-site">
-          <option value="PIN" selected>Pintendre (PIN)</option>
-          <option value="PIK">Pickering (PIK)</option>
-        </select>
-      </div>
       <div id="uav-metric-control" class="is-hidden">
         <label for="uav-metric">Metric</label>
         <select id="uav-metric"></select>
@@ -430,6 +431,21 @@
           <button type="button" class="active" data-mode="compare">Compare dates</button>
           <button type="button" data-mode="range">Date range</button>
         </div>
+      </div>
+      <div id="uav-site-control" class="is-hidden">
+        <label for="uav-site">Site</label>
+        <select id="uav-site">
+          <option value="PIN" selected>Pintendre (PIN)</option>
+          <option value="PIK">Pickering (PIK)</option>
+        </select>
+      </div>
+      <div id="uav-range-from" class="is-hidden">
+        <label for="uav-from-date">From</label>
+        <input type="date" id="uav-from-date">
+      </div>
+      <div id="uav-range-to" class="is-hidden">
+        <label for="uav-to-date">To</label>
+        <input type="date" id="uav-to-date">
       </div>
       <div id="uav-filter-group" class="is-hidden">
         <label>Date</label>
@@ -452,13 +468,147 @@
           <button type="button" class="btn" id="uav-clear-series" disabled>Clear</button>
         </div>
       </div>
-      <div id="uav-range-from" class="is-hidden">
-        <label for="uav-from-date">From</label>
-        <input type="date" id="uav-from-date">
+      <div id="lidar-metric-control" class="is-hidden">
+        <label for="lidar-metric">Metric</label>
+        <select id="lidar-metric"></select>
       </div>
-      <div id="uav-range-to" class="is-hidden">
-        <label for="uav-to-date">To</label>
-        <input type="date" id="uav-to-date">
+      <div id="lidar-date-mode-control" class="is-hidden">
+        <label>View</label>
+        <div class="mode-toggle" id="lidar-mode-toggle">
+          <button type="button" class="active" data-mode="compare">Compare dates</button>
+          <button type="button" data-mode="range">Date range</button>
+        </div>
+      </div>
+      <div id="lidar-site-control" class="is-hidden">
+        <label for="lidar-site">Site</label>
+        <select id="lidar-site">
+          <option value="PIN" selected>Pintendre (PIN)</option>
+          <option value="PIK">Pickering (PIK)</option>
+        </select>
+      </div>
+      <div id="lidar-range-from" class="is-hidden">
+        <label for="lidar-from-date">From</label>
+        <input type="date" id="lidar-from-date">
+      </div>
+      <div id="lidar-range-to" class="is-hidden">
+        <label for="lidar-to-date">To</label>
+        <input type="date" id="lidar-to-date">
+      </div>
+      <div id="lidar-filter-group" class="is-hidden">
+        <label>Date</label>
+        <div class="date-filter-group">
+          <select id="lidar-flt-year" aria-label="LiDAR flight year">
+            <option value="">Year</option>
+          </select>
+          <select id="lidar-flt-month" aria-label="LiDAR flight month">
+            <option value="">Month</option>
+          </select>
+          <select id="lidar-flt-day" aria-label="LiDAR flight day">
+            <option value="">Day</option>
+          </select>
+        </div>
+      </div>
+      <div id="lidar-compare-actions" class="is-hidden">
+        <label>&nbsp;</label>
+        <div class="btn-row">
+          <button type="button" class="btn primary" id="lidar-add-series">Add series</button>
+          <button type="button" class="btn" id="lidar-clear-series" disabled>Clear</button>
+        </div>
+      </div>
+      <div id="gnss-metric-control" class="is-hidden">
+        <label for="gnss-metric">Metric</label>
+        <select id="gnss-metric"></select>
+      </div>
+      <div id="gnss-date-mode-control" class="is-hidden">
+        <label>View</label>
+        <div class="mode-toggle" id="gnss-mode-toggle">
+          <button type="button" class="active" data-mode="compare">Compare dates</button>
+          <button type="button" data-mode="range">Date range</button>
+        </div>
+      </div>
+      <div id="gnss-site-control" class="is-hidden">
+        <label for="gnss-site">Site</label>
+        <select id="gnss-site">
+          <option value="PIN" selected>Pintendre (PIN)</option>
+          <option value="PIK">Pickering (PIK)</option>
+        </select>
+      </div>
+      <div id="gnss-range-from" class="is-hidden">
+        <label for="gnss-from-date">From</label>
+        <input type="date" id="gnss-from-date">
+      </div>
+      <div id="gnss-range-to" class="is-hidden">
+        <label for="gnss-to-date">To</label>
+        <input type="date" id="gnss-to-date">
+      </div>
+      <div id="gnss-filter-group" class="is-hidden">
+        <label>Date</label>
+        <div class="date-filter-group">
+          <select id="gnss-flt-year" aria-label="GNSS flight year">
+            <option value="">Year</option>
+          </select>
+          <select id="gnss-flt-month" aria-label="GNSS flight month">
+            <option value="">Month</option>
+          </select>
+          <select id="gnss-flt-day" aria-label="GNSS flight day">
+            <option value="">Day</option>
+          </select>
+        </div>
+      </div>
+      <div id="gnss-compare-actions" class="is-hidden">
+        <label>&nbsp;</label>
+        <div class="btn-row">
+          <button type="button" class="btn primary" id="gnss-add-series">Add series</button>
+          <button type="button" class="btn" id="gnss-clear-series" disabled>Clear</button>
+        </div>
+      </div>
+      <div id="soil-site-control" class="is-hidden">
+        <label for="soil-site">Site</label>
+        <select id="soil-site">
+          <option value="PIK" selected>Pickering (PIK)</option>
+          <option value="PIN">Pintendre (PIN)</option>
+        </select>
+      </div>
+      <div id="soil-sensor-control" class="is-hidden">
+        <label for="soil-sensor">Sensor</label>
+        <select id="soil-sensor"></select>
+      </div>
+      <div id="soil-interval-control" class="is-hidden">
+        <label for="soil-interval">Interval</label>
+        <select id="soil-interval">
+          <option value="hourly">Hourly</option>
+          <option value="daily" selected>Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+        </select>
+      </div>
+      <div id="soil-metric-control" class="is-hidden">
+        <label for="soil-metric">Metric</label>
+        <select id="soil-metric"></select>
+      </div>
+      <div id="soil-range-from" class="is-hidden">
+        <label for="soil-from-date">From</label>
+        <input type="date" id="soil-from-date">
+      </div>
+      <div id="soil-range-to" class="is-hidden">
+        <label for="soil-to-date">To</label>
+        <input type="date" id="soil-to-date">
+      </div>
+      <div id="pigments-site-control" class="is-hidden">
+        <label for="pigments-site">Site</label>
+        <select id="pigments-site">
+          <option value="all">All sites</option>
+          <option value="PIK">Pickering (PIK)</option>
+          <option value="PIN" selected>Pintendre (PIN)</option>
+        </select>
+      </div>
+      <div id="pigments-from-control" class="is-hidden">
+        <label for="pigments-from">From</label>
+        <input type="datetime-local" id="pigments-from">
+      </div>
+      <div id="pigments-to-control" class="is-hidden">
+        <label for="pigments-to">To</label>
+        <input type="datetime-local" id="pigments-to">
       </div>
       </div>
     </div>
@@ -483,6 +633,21 @@
         <button type="button" class="btn" id="weather-download-full-csv">Download full dataset (CSV)</button>
       </div>
       <div id="weather-metadata" class="metadata-panel loading">Loading metadata…</div>
+    </div>
+
+    <div id="soil-section" class="is-hidden">
+      <div id="soil-range-label" class="range-label is-hidden"></div>
+      <div class="chart-box is-hidden" id="soil-chart-box">
+        <h3 id="soil-chart-title">Soil moisture — means</h3>
+        <div class="chart-canvas"><canvas id="soil-chart"></canvas></div>
+      </div>
+      <div id="soil-count" class="dataset-count"></div>
+      <div id="soil-table" class="data-table"></div>
+      <div id="soil-table-footer" class="data-table-footer is-hidden">
+        <button type="button" class="btn" id="soil-download-csv">Download table (CSV)</button>
+        <button type="button" class="btn" id="soil-download-full-csv">Download full dataset (CSV)</button>
+      </div>
+      <div id="soil-metadata" class="metadata-panel loading">Loading metadata…</div>
     </div>
 
     <div id="fluorescence-section">
@@ -522,6 +687,18 @@
       </div>
       <div id="reflectance-metadata" class="metadata-panel loading">Loading metadata…</div>
     </div>
+
+    <div id="pigments-section" class="is-hidden">
+      <div class="pigments-panel">
+        <h3>Pigment campaigns in range</h3>
+        <ul id="pigments-campaign-list" class="pigments-campaign-list"></ul>
+      </div>
+      <div id="pigments-count" class="dataset-count"></div>
+      <div class="pigments-actions data-table-footer">
+        <button type="button" class="btn primary" id="pigments-download-zip">Download data (ZIP)</button>
+      </div>
+      <div id="pigments-metadata" class="metadata-panel loading">Loading metadata…</div>
+    </div>
   </div>
 
   <div id="uav-section" class="is-hidden">
@@ -540,10 +717,45 @@
       <button type="button" class="btn" id="uav-download-csv">Download table (CSV)</button>
       <button type="button" class="btn" id="uav-download-full-csv">Download full dataset (CSV)</button>
     </div>
-    <div id="uav-metadata" class="metadata-panel">
-      <h3>UAV hyperspectral reflectance</h3>
-      <p>Tree-level index metrics from UAV flights (NDVI, GNDVI, PRI, etc.) for 2022 and 2023. In backend mode, charts and tables load via the query API so large year files are not parsed in the browser.</p>
+    <div id="uav-metadata" class="metadata-panel loading">Loading metadata…</div>
+  </div>
+
+  <div id="lidar-section" class="is-hidden">
+    <div class="series-chips" id="lidar-series-chips" aria-live="polite"></div>
+    <div class="compare-empty" id="lidar-compare-empty">
+      Choose a metric, site, and flight date, then click <strong>Add series</strong> to build a comparison chart.
     </div>
+    <div id="lidar-range-label" class="range-label is-hidden"></div>
+    <div class="chart-box is-hidden" id="lidar-chart-box">
+      <h3 id="lidar-chart-title">UAV LiDAR — daily means</h3>
+      <div class="chart-canvas"><canvas id="lidar-chart"></canvas></div>
+    </div>
+    <div id="lidar-count" class="dataset-count"></div>
+    <div id="lidar-table" class="data-table"></div>
+    <div id="lidar-table-footer" class="data-table-footer is-hidden">
+      <button type="button" class="btn" id="lidar-download-csv">Download table (CSV)</button>
+      <button type="button" class="btn" id="lidar-download-full-csv">Download full dataset (CSV)</button>
+    </div>
+    <div id="lidar-metadata" class="metadata-panel loading">Loading metadata…</div>
+  </div>
+
+  <div id="gnss-section" class="is-hidden">
+    <div class="series-chips" id="gnss-series-chips" aria-live="polite"></div>
+    <div class="compare-empty" id="gnss-compare-empty">
+      Choose a metric, site, and flight date, then click <strong>Add series</strong> to build a comparison chart.
+    </div>
+    <div id="gnss-range-label" class="range-label is-hidden"></div>
+    <div class="chart-box is-hidden" id="gnss-chart-box">
+      <h3 id="gnss-chart-title">UAV GNSS — daily means</h3>
+      <div class="chart-canvas"><canvas id="gnss-chart"></canvas></div>
+    </div>
+    <div id="gnss-count" class="dataset-count"></div>
+    <div id="gnss-table" class="data-table"></div>
+    <div id="gnss-table-footer" class="data-table-footer is-hidden">
+      <button type="button" class="btn" id="gnss-download-csv">Download table (CSV)</button>
+      <button type="button" class="btn" id="gnss-download-full-csv">Download full dataset (CSV)</button>
+    </div>
+    <div id="gnss-metadata" class="metadata-panel loading">Loading metadata…</div>
   </div>
 
   <div id="wp-section">
@@ -571,18 +783,61 @@ let apiMode = location.port === "8000" || new URLSearchParams(location.search).h
 let DATA_BASE = apiMode ? "/api/data/fastpheno/" : "./data/fastpheno/";
 let QUERY_BASE = apiMode ? "/api/query" : null;
 
+function apiHealthCandidates() {
+  const out = [`${location.origin}/api/health`];
+  if (location.port !== "8000") {
+    out.push("http://127.0.0.1:8000/api/health", "http://localhost:8000/api/health");
+  }
+  return out;
+}
+
+function applyApiMode(queryBase) {
+  apiMode = true;
+  if (queryBase.startsWith("http")) {
+    const root = queryBase.replace(/\/api\/query\/?$/, "");
+    DATA_BASE = `${root}/api/data/fastpheno/`;
+    QUERY_BASE = `${root}/api/query`;
+  } else {
+    DATA_BASE = "/api/data/fastpheno/";
+    QUERY_BASE = "/api/query";
+  }
+}
+
 async function ensureApiMode() {
   if (QUERY_BASE) return true;
-  try {
-    const response = await fetch("/api/health");
-    if (response.ok) {
-      apiMode = true;
-      DATA_BASE = "/api/data/fastpheno/";
-      QUERY_BASE = "/api/query";
+  for (const healthUrl of apiHealthCandidates()) {
+    try {
+      const response = await fetch(healthUrl);
+      if (!response.ok) continue;
+      const queryBase = healthUrl.replace(/\/api\/health\/?$/, "/api/query");
+      applyApiMode(queryBase);
       return true;
-    }
-  } catch {}
+    } catch {}
+  }
   return false;
+}
+
+function getPigmentsBase() {
+  if (!QUERY_BASE) return null;
+  return QUERY_BASE.startsWith("http")
+    ? QUERY_BASE.replace(/\/api\/query\/?$/, "/api/pigments")
+    : "/api/pigments";
+}
+
+async function pigmentsJson(path, params = {}) {
+  const base = getPigmentsBase();
+  if (!base) throw new Error("Pigments API requires the FastAPI backend (port 8000 or ?api)");
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value != null && value !== "") qs.set(key, String(value));
+  });
+  const url = `${base}${path}?${qs.toString()}`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(parseApiError(detail, response.status));
+  }
+  return response.json();
 }
 
 function parseApiError(detail, status) {
@@ -699,9 +954,9 @@ const ERD_DOMAINS = {
     title: "UAV",
     blurb: "Airborne tree-level products keyed by primary_key (e.g. PIK_1001).",
     entities: [
-      { id: "lidar", title: "LiDAR", desc: "Tree height, location, and structural metrics.", pk: "primary_key", available: false },
+      { id: "lidar", title: "LiDAR", desc: "Tree height, location, and structural metrics.", pk: "primary_key", available: true, sensor: "lidar" },
       { id: "hyp_spec", title: "Hyp_spec", desc: "UAV hyperspectral reflectance indices.", pk: "primary_key", available: true, sensor: "uav" },
-      { id: "gnss", title: "GNSS", desc: "Tree geolocation and GNSS metadata.", pk: "primary_key", available: false },
+      { id: "gnss", title: "GNSS", desc: "Tree geolocation and GNSS metadata.", pk: "primary_key", available: true, sensor: "gnss" },
     ],
   },
   ground: {
@@ -711,7 +966,7 @@ const ERD_DOMAINS = {
     entities: [
       { id: "fluorescence", title: "Fluorescence", desc: "Chlorophyll fluorescence (QY_max, NPQ, …).", pk: "primary_key", available: true, sensor: "fluorescence" },
       { id: "leaf_reflectance", title: "Leaf_reflectance", desc: "Leaf / UniSpec vegetation indices.", pk: "primary_key", available: true, sensor: "reflectance" },
-      { id: "pigments", title: "Pigments", desc: "Leaf pigment concentrations.", pk: "primary_key", available: false },
+      { id: "pigments", title: "Pigments", desc: "Leaf pigment concentrations — download campaign folders by date range.", pk: "primary_key", available: true, sensor: "pigments" },
       { id: "tlp", title: "TLP", desc: "Turgor loss point / pressure–volume parameters.", pk: "primary_key", available: false },
       { id: "wp", title: "WP", desc: "Predawn leaf water potential (Ψ).", pk: "primary_key", available: true, sensor: "wp" },
       { id: "xylem_vulnerability", title: "Xylem_vulnerability", desc: "Xylem vulnerability curves.", pk: "primary_key", available: false },
@@ -725,7 +980,7 @@ const ERD_DOMAINS = {
     blurb: "Site-level climate and environment keyed by siteID.",
     entities: [
       { id: "climate", title: "Climate", desc: "Site climate / weather (current build: ECCC and Daymet daily).", pk: "siteID", available: true, sensor: "weather" },
-      { id: "soil_moisture", title: "Soil moisture", desc: "Soil moisture measurements.", pk: "siteID", available: false },
+      { id: "soil_moisture", title: "Soil moisture", desc: "Soil moisture and temperature from field sensors.", pk: "siteID", available: true, sensor: "soil_moisture" },
       { id: "soil_texture", title: "Soil texture", desc: "Soil texture classes and related properties.", pk: "siteID", available: false },
     ],
   },
@@ -733,27 +988,46 @@ const ERD_DOMAINS = {
 
 const SENSORS = {
   weather: { title: "Climate", sectionId: "weather-section", hasData: () => hasWeatherData(), domain: "environmental", entity: "climate" },
+  soil_moisture: { title: "Soil moisture", sectionId: "soil-section", hasData: () => hasSoilData(), domain: "environmental", entity: "soil_moisture" },
   fluorescence: { title: "Fluorescence", sectionId: "fluorescence-section", hasData: () => hasFluorescenceData(), domain: "ground", entity: "fluorescence" },
   reflectance: { title: "Leaf_reflectance", sectionId: "reflectance-section", hasData: () => hasReflectanceData(), domain: "ground", entity: "leaf_reflectance" },
+  pigments: { title: "Pigments", sectionId: "pigments-section", hasData: () => hasPigmentsData(), domain: "ground", entity: "pigments" },
   wp: { title: "WP", sectionId: "wp-section", hasData: () => hasWPData(), domain: "ground", entity: "wp" },
-  uav: { title: "Hyp_spec", sectionId: "uav-section", hasData: () => hasUavData(), domain: "uav", entity: "hyp_spec" },
+  uav: { title: "Hyp_spec", sectionId: "uav-section", hasData: () => hasFlightData(), domain: "uav", entity: "hyp_spec" },
+  lidar: { title: "LiDAR", sectionId: "lidar-section", hasData: () => hasFlightData(), domain: "uav", entity: "lidar" },
+  gnss: { title: "GNSS", sectionId: "gnss-section", hasData: () => hasFlightData(), domain: "uav", entity: "gnss" },
 };
 
 let activeDomain = null;
 let activeEntity = null;
 let activeSensor = null;
 let reflectanceFieldOrder = [], fluorescenceFieldOrder = [];
-let uavMeta = null;
-let uavTableRows = [];
-let uavTableTotal = 0;
-let uavRequestId = 0;
-let lastUavSite = null;
-let uavMetaSite = null;
-let uavDateMode = "compare";
-let uavCompareSeries = [];
-const uavSeriesRowCache = new Map();
+const FLIGHT_SENSOR_IDS = ["uav", "lidar", "gnss"];
+const FLIGHT_TABLE_PREVIEW_SIZE = 500;
+/** Above this row count, load a preview page instead of the full table in the browser. */
+const FLIGHT_TABLE_MAX_ROWS = 100_000;
+
+function createFlightSensorState() {
+  return {
+    meta: null,
+    metaSite: null,
+    tableRows: [],
+    tableTotal: 0,
+    requestId: 0,
+    lastSite: null,
+    dateMode: "compare",
+    compareSeries: [],
+    seriesRowCache: new Map(),
+    table: null,
+    tableTruncated: false,
+  };
+}
+
+const flightSensorState = Object.fromEntries(
+  FLIGHT_SENSOR_IDS.map(id => [id, createFlightSensorState()])
+);
 let charts = {};
-let weatherTable, fluorescenceTable, reflectanceTable, wpTable, uavTable;
+let weatherTable, fluorescenceTable, reflectanceTable, wpTable;
 let weatherDateMode = "single";
 let campaignDateMode = { fluor: "compare", refl: "compare", wp: "compare" };
 /** @type {{ fluor: {site?: string, date: string}[], refl: {site?: string, date: string}[], wp: {date: string}[] }} */
@@ -838,6 +1112,7 @@ async function ensureSensorReady(sensorId) {
   if (!QUERY_BASE) return false;
   if (sensorId === "weather") {
     await loadWeatherMeta();
+    populateWeatherMetricFilter();
     syncWeatherDateInputs(true);
     return true;
   }
@@ -861,12 +1136,24 @@ async function ensureSensorReady(sensorId) {
     if (isCampaignRangeMode("wp")) syncCampaignDateInputs("wp", true);
     return true;
   }
-  if (sensorId === "uav") {
-    await loadUavMeta();
-    populateUavMetricFilter();
-    syncUavCompareMetricLock();
-    if (isUavRangeMode()) syncUavDateInputs(true);
-    else populateUavFlightDateFilters({ reset: true });
+  if (sensorId === "uav" || sensorId === "lidar" || sensorId === "gnss") {
+    await loadFlightMeta(sensorId);
+    populateFlightMetricFilter(sensorId);
+    syncFlightCompareMetricLock(sensorId);
+    if (isFlightRangeMode(sensorId)) syncFlightDateInputs(sensorId, true);
+    else populateFlightDateFilters(sensorId, { reset: true });
+    return true;
+  }
+  if (sensorId === "soil_moisture") {
+    await loadSoilMeta();
+    populateSoilMetricFilter();
+    populateSoilSensorFilter();
+    syncSoilDateInputs(true);
+    return true;
+  }
+  if (sensorId === "pigments") {
+    await loadPigmentsMeta();
+    syncPigmentsDateInputs(true);
     return true;
   }
   return true;
@@ -877,6 +1164,11 @@ function loadSensorMetadata(sensorId) {
     fluorescence: { id: "fluorescence-metadata", path: "fluorescence_pin_2023.md" },
     reflectance: { id: "reflectance-metadata", path: "reflectance_pin_2023.md" },
     wp: { id: "wp-metadata", path: "predawn_wp_pin_2023.md" },
+    uav: { id: "uav-metadata", path: "uav_hyp_spec.md" },
+    lidar: { id: "lidar-metadata", path: "uav_lidar.md" },
+    gnss: { id: "gnss-metadata", path: "uav_gnss.md" },
+    soil_moisture: { id: "soil-metadata", path: "soil_moisture.md" },
+    pigments: { id: "pigments-metadata", path: "pigments.md" },
   }[sensorId];
   if (!panels) {
     if (sensorId === "weather") return loadWeatherMetadata();
@@ -1175,11 +1467,61 @@ async function addCompareSeries(kind) {
 }
 
 function clearCompareSeries(kind) {
+  resetCompareSeriesState(kind);
+  refreshCompareSection(kind);
+}
+
+const DEFAULT_SITE = "PIN";
+
+function resetCompareSeriesState(kind) {
   compareSeries[kind] = [];
   [...campaignRowCache.keys()].forEach(key => {
     if (key.startsWith(`${kind}__`)) campaignRowCache.delete(key);
   });
-  refreshCompareSection(kind);
+}
+
+async function resetCampaignFiltersForModeSwitch(kind) {
+  resetCompareSeriesState(kind);
+  campaignMeta[kind] = null;
+  campaignMetaKey[kind] = "";
+  if (compareUsesSite(kind)) {
+    const siteEl = document.getElementById(`${kind}-site`);
+    if (siteEl) siteEl.value = DEFAULT_SITE;
+  }
+  if (kind === "fluor") populateFluorescenceMetricFilter();
+  else if (kind === "refl") populateReflectanceMetricFilter();
+  syncCompareMetricLock(kind);
+  await loadCampaignMeta(kind);
+  if (isCampaignRangeMode(kind)) syncCampaignDateInputs(kind, true);
+  else populateCompareDateFilters(kind, { reset: true });
+}
+
+async function resetFlightFiltersForModeSwitch(fsId) {
+  const state = fsState(fsId);
+  state.compareSeries = [];
+  state.seriesRowCache.clear();
+  const siteEl = fsEl(fsId, "site");
+  if (siteEl) siteEl.value = DEFAULT_SITE;
+  state.meta = null;
+  state.metaSite = null;
+  state.lastSite = null;
+  populateFlightMetricFilter(fsId);
+  syncFlightCompareMetricLock(fsId);
+  await loadFlightMeta(fsId, true);
+  if (isFlightRangeMode(fsId)) syncFlightDateInputs(fsId, true);
+  else populateFlightDateFilters(fsId, { reset: true });
+}
+
+async function resetWeatherFiltersForModeSwitch() {
+  const siteEl = document.getElementById("site-filter");
+  const sourceEl = document.getElementById("weather-source");
+  if (siteEl) siteEl.value = DEFAULT_SITE;
+  if (sourceEl) sourceEl.value = "eccc";
+  weatherMeta = null;
+  weatherMetaKey = "";
+  await loadWeatherMeta();
+  populateWeatherMetricFilter();
+  syncWeatherDateInputs(true);
 }
 
 async function refreshCompareSection(kind) {
@@ -1244,6 +1586,7 @@ function normalizeMetricValue(v) {
 }
 
 function isMetricConstantForSite(rows, field) {
+  if (rows.length <= 1) return false;
   const values = new Set();
   for (const row of rows) {
     const norm = normalizeMetricValue(row[field]);
@@ -1780,10 +2123,6 @@ function updateCampaignRangeChart(kind, rows) {
   });
 }
 
-function buildUavQuery(path, params) {
-  return buildQuery(path, params);
-}
-
 async function updateCampaignSection(kind) {
   const config = {
     fluor: {
@@ -1970,7 +2309,6 @@ async function updateCampaignSection(kind) {
     if (table) {
       table.setColumns(WP_COLUMNS);
       table.setData(rows);
-      table.setLayout("fitColumns");
       table.redraw(true);
     } else {
       config.setTable(new Tabulator(config.tableSelector, {
@@ -2030,10 +2368,15 @@ function getFilteredWeather() {
 }
 
 function hasWeatherData() { return hasSensorApi(); }
+function hasPigmentsData() { return hasSensorApi(); }
+function hasSoilData() { return hasSensorApi(); }
 function hasFluorescenceData() { return hasSensorApi(); }
 function hasReflectanceData() { return hasSensorApi(); }
 function hasWPData() { return hasSensorApi(); }
-function hasUavData() { return hasSensorApi(); }
+function hasFlightData() { return hasSensorApi(); }
+function hasUavData() { return hasFlightData(); }
+function hasLidarData() { return hasFlightData(); }
+function hasGnssData() { return hasFlightData(); }
 
 const UAV_METRICS = [
   { field: "NDVI_mean", label: "NDVI (mean)" },
@@ -2045,148 +2388,267 @@ const UAV_METRICS = [
   { field: "WaterIndex_mean", label: "Water index (mean)" },
 ];
 
-function getUavSite() {
-  return document.getElementById("uav-site")?.value || "PIN";
+const LIDAR_METRICS = [
+  { field: "tree_height_corrected_m", label: "Tree height (m)" },
+  { field: "canopy_area_m2", label: "Canopy area (m²)" },
+  { field: "tree_altitude_m", label: "Tree altitude (m)" },
+];
+
+const GNSS_METRICS = [
+  { field: "treeTop_x", label: "Tree top X" },
+  { field: "treeTop_y", label: "Tree top Y" },
+  { field: "treeTop_x_std", label: "Tree top X std" },
+  { field: "treeTop_y_std", label: "Tree top Y std" },
+];
+
+const FLIGHT_SENSOR_CONFIG = {
+  uav: {
+    domain: "uav",
+    title: "UAV hyperspectral",
+    rowLabel: "UAV row",
+    metrics: UAV_METRICS,
+    defaultMetric: "NDVI_mean",
+    rangeChartTitle: (site, metricLabel) => `UAV ${site} — ${metricLabel}`,
+    getTableColumns: () => [
+      { title: "Site", field: "site", width: 70 },
+      { title: "Year", field: "year", width: 70 },
+      { title: "Flight date", field: "flight_date", minWidth: 110 },
+      { title: "Tree ID", field: "site_treeid", minWidth: 100 },
+      { title: "Confidence", field: "confidence", formatter: numFmt, minWidth: 90 },
+      { title: "NDVI", field: "NDVI_mean", formatter: numFmt },
+      { title: "GNDVI", field: "GNDVI_mean", formatter: numFmt },
+      { title: "PRI", field: "PRI_mean", formatter: numFmt },
+      { title: "NDRE", field: "NDRE_mean", formatter: numFmt },
+      { title: "CCI", field: "CCI_mean", formatter: numFmt },
+      { title: "NIRv", field: "NIRv_mean", formatter: numFmt },
+      { title: "Water index", field: "WaterIndex_mean", formatter: numFmt },
+    ],
+    async downloadFullCsv(site) {
+      const years = flightSensorState.uav.meta?.years || [2022, 2023];
+      await Promise.all(years.map(year => downloadSourceCsvFile(`uav_reflectance_${year}.csv`)));
+    },
+  },
+  lidar: {
+    domain: "lidar",
+    title: "UAV LiDAR",
+    rowLabel: "LiDAR row",
+    metrics: LIDAR_METRICS,
+    defaultMetric: "tree_height_corrected_m",
+    rangeChartTitle: (site, metricLabel) => `LiDAR ${site} — ${metricLabel}`,
+    getTableColumns: () => [
+      { title: "Site", field: "site", width: 70 },
+      { title: "Year", field: "year", width: 70 },
+      { title: "Flight date", field: "flight_date", minWidth: 110 },
+      { title: "Flight ID", field: "flight_id", minWidth: 100 },
+      { title: "Tree ID", field: "site_treeid", minWidth: 100 },
+      { title: "Height (m)", field: "tree_height_corrected_m", formatter: numFmt },
+      { title: "Canopy area (m²)", field: "canopy_area_m2", formatter: numFmt },
+      { title: "Altitude (m)", field: "tree_altitude_m", formatter: numFmt },
+    ],
+    async downloadFullCsv(site) {
+      const years = flightSensorState.lidar.meta?.years || [];
+      await Promise.all(
+        years.map(year => downloadSourceCsvFile(`uav_lidar_${site.toLowerCase()}_${year}.csv`))
+      );
+    },
+  },
+  gnss: {
+    domain: "gnss",
+    title: "UAV GNSS",
+    rowLabel: "GNSS row",
+    metrics: GNSS_METRICS,
+    defaultMetric: "treeTop_x",
+    rangeChartTitle: (site, metricLabel) => `GNSS ${site} — ${metricLabel}`,
+    getTableColumns: () => [
+      { title: "Site", field: "site", width: 70 },
+      { title: "Year", field: "year", width: 70 },
+      { title: "Flight date", field: "flight_date", minWidth: 110 },
+      { title: "Flight ID", field: "flight_id", minWidth: 100 },
+      { title: "Tree ID", field: "site_treeid", minWidth: 100 },
+      { title: "Tree top X", field: "treeTop_x", formatter: numFmt },
+      { title: "Tree top Y", field: "treeTop_y", formatter: numFmt },
+      { title: "Tree top X std", field: "treeTop_x_std", formatter: numFmt },
+      { title: "Tree top Y std", field: "treeTop_y_std", formatter: numFmt },
+    ],
+    async downloadFullCsv(site) {
+      const years = flightSensorState.gnss.meta?.years || [];
+      await Promise.all(
+        years.map(year => downloadSourceCsvFile(`uav_gnss_${site.toLowerCase()}_${year}.csv`))
+      );
+    },
+  },
+};
+
+function fsEl(fsId, suffix) {
+  return document.getElementById(`${fsId}-${suffix}`);
 }
 
-function uavYearFromDate(date) {
+function fsState(fsId) {
+  return flightSensorState[fsId];
+}
+
+function fsCfg(fsId) {
+  return FLIGHT_SENSOR_CONFIG[fsId];
+}
+
+function getFlightSite(fsId) {
+  return fsEl(fsId, "site")?.value || "PIN";
+}
+
+function flightYearFromDate(date) {
   return parseInt(String(date).slice(0, 4), 10);
 }
 
-function getUavMetric() {
-  return document.getElementById("uav-metric")?.value || "NDVI_mean";
+function getFlightMetric(fsId) {
+  const cfg = fsCfg(fsId);
+  return fsEl(fsId, "metric")?.value || cfg.defaultMetric;
 }
 
-function getUavDateRange() {
+function getFlightDateRange(fsId) {
   return {
-    from: document.getElementById("uav-from-date")?.value || "",
-    to: document.getElementById("uav-to-date")?.value || "",
+    from: fsEl(fsId, "from-date")?.value || "",
+    to: fsEl(fsId, "to-date")?.value || "",
   };
 }
 
-function isUavRangeMode() {
-  return uavDateMode === "range";
+function isFlightRangeMode(fsId) {
+  return fsState(fsId).dateMode === "range";
 }
 
-function getSelectedUavFlightDate() {
-  const year = document.getElementById("uav-flt-year")?.value || "";
-  const month = document.getElementById("uav-flt-month")?.value || "";
-  const day = document.getElementById("uav-flt-day")?.value || "";
+function getSelectedFlightDate(fsId) {
+  const year = fsEl(fsId, "flt-year")?.value || "";
+  const month = fsEl(fsId, "flt-month")?.value || "";
+  const day = fsEl(fsId, "flt-day")?.value || "";
   if (!year || !month || !day) return "";
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-function uavSeriesKey(series) {
+function flightSeriesKey(series) {
   return `${series.year}__${series.site}__${series.date}`;
 }
 
-function uavSeriesLabel(series) {
+function flightSeriesLabel(series) {
   return `${series.site} · ${shortCompareDateLabel(series.date)}`;
 }
 
-function uavSeriesFullLabel(series) {
+function flightSeriesFullLabel(series) {
   return `${series.site} · ${formatWeatherDisplay(series.date)}`;
 }
 
-function getAvailableUavCompareDates() {
-  const site = getUavSite();
+function getAvailableFlightCompareDates(fsId) {
+  const site = getFlightSite(fsId);
+  const state = fsState(fsId);
   const used = new Set(
-    uavCompareSeries.filter(s => s.site === site).map(s => s.date)
+    state.compareSeries.filter(s => s.site === site).map(s => s.date)
   );
-  return (uavMeta?.flight_dates || []).filter(d => !used.has(d)).sort();
+  return (state.meta?.flight_dates || []).filter(d => !used.has(d)).sort();
 }
 
-function updateUavDateModeUI() {
-  const active = activeSensor === "uav";
-  const isRange = isUavRangeMode();
-  setVisible("uav-filter-group", active && !isRange);
-  setVisible("uav-compare-actions", active && !isRange);
-  setVisible("uav-range-from", active && isRange);
-  setVisible("uav-range-to", active && isRange);
+function updateFlightDateModeUI(fsId) {
+  const active = activeSensor === fsId;
+  const isRange = isFlightRangeMode(fsId);
+  setVisible(`${fsId}-filter-group`, active && !isRange);
+  setVisible(`${fsId}-compare-actions`, active && !isRange);
+  setVisible(`${fsId}-range-from`, active && isRange);
+  setVisible(`${fsId}-range-to`, active && isRange);
 }
 
-function syncUavCompareMetricLock() {
-  const locked = uavCompareSeries.length > 0;
-  const metricSel = document.getElementById("uav-metric");
-  const clearBtn = document.getElementById("uav-clear-series");
-  const addBtn = document.getElementById("uav-add-series");
+function syncFlightCompareMetricLock(fsId) {
+  const state = fsState(fsId);
+  const locked = state.compareSeries.length > 0;
+  const metricSel = fsEl(fsId, "metric");
+  const clearBtn = fsEl(fsId, "clear-series");
+  const addBtn = fsEl(fsId, "add-series");
   if (metricSel) metricSel.disabled = locked;
   if (clearBtn) clearBtn.disabled = !locked;
-  if (addBtn) addBtn.disabled = locked
-    ? uavCompareSeries.length >= COMPARE_MAX_SERIES
-    : !getAvailableUavCompareDates().length;
+  if (addBtn) {
+    addBtn.disabled = locked
+      ? state.compareSeries.length >= COMPARE_MAX_SERIES
+      : !getAvailableFlightCompareDates(fsId).length;
+  }
 }
 
-function renderUavCompareSeriesChips() {
-  const wrap = document.getElementById("uav-series-chips");
+function renderFlightCompareSeriesChips(fsId) {
+  const wrap = fsEl(fsId, "series-chips");
   if (!wrap) return;
-  wrap.innerHTML = uavCompareSeries.map((series, i) => `
+  const state = fsState(fsId);
+  wrap.innerHTML = state.compareSeries.map((series, i) => `
     <span class="series-chip" style="border-color:${COMPARE_COLORS[i % COMPARE_COLORS.length]}">
-      ${uavSeriesFullLabel(series)}
-      <button type="button" data-remove="${uavSeriesKey(series)}" aria-label="Remove ${uavSeriesFullLabel(series)}">×</button>
+      ${flightSeriesFullLabel(series)}
+      <button type="button" data-remove="${flightSeriesKey(series)}" aria-label="Remove ${flightSeriesFullLabel(series)}">×</button>
     </span>
   `).join("");
   wrap.querySelectorAll("button[data-remove]").forEach(btn => {
     btn.addEventListener("click", () => {
       const key = btn.dataset.remove;
-      uavCompareSeries = uavCompareSeries.filter(s => uavSeriesKey(s) !== key);
-      uavSeriesRowCache.delete(key);
-      updateUavSection();
+      state.compareSeries = state.compareSeries.filter(s => flightSeriesKey(s) !== key);
+      state.seriesRowCache.delete(key);
+      updateFlightSection(fsId);
     });
   });
 }
 
-async function fetchUavRowsForSeries(series) {
-  const key = uavSeriesKey(series);
-  if (uavSeriesRowCache.has(key)) return uavSeriesRowCache.get(key);
-  const payload = await queryJson(buildUavQuery("/uav/rows", {
+async function fetchFlightRowsForSeries(fsId, series) {
+  const cfg = fsCfg(fsId);
+  const key = flightSeriesKey(series);
+  const state = fsState(fsId);
+  if (state.seriesRowCache.has(key)) return state.seriesRowCache.get(key);
+  const payload = await queryJson(buildQuery(`/${cfg.domain}/rows`, {
     site: series.site,
     from: series.date,
     to: series.date,
     all: "true",
   }));
   const rows = payload.rows || [];
-  uavSeriesRowCache.set(key, rows);
+  state.seriesRowCache.set(key, rows);
   return rows;
 }
 
-async function addUavCompareSeries() {
-  const date = getSelectedUavFlightDate();
+async function addFlightCompareSeries(fsId) {
+  const date = getSelectedFlightDate(fsId);
   if (!date) return;
-  const next = { year: uavYearFromDate(date), site: getUavSite(), date };
-  if (uavCompareSeries.some(s => uavSeriesKey(s) === uavSeriesKey(next))) return;
-  if (uavCompareSeries.length >= COMPARE_MAX_SERIES) return;
-  document.getElementById("uav-count").textContent = "Loading flight data…";
-  await fetchUavRowsForSeries(next);
-  uavCompareSeries = [...uavCompareSeries, next];
-  await updateUavSection();
+  const state = fsState(fsId);
+  const next = { year: flightYearFromDate(date), site: getFlightSite(fsId), date };
+  if (state.compareSeries.some(s => flightSeriesKey(s) === flightSeriesKey(next))) return;
+  if (state.compareSeries.length >= COMPARE_MAX_SERIES) return;
+  fsEl(fsId, "count").textContent = "Loading flight data…";
+  await fetchFlightRowsForSeries(fsId, next);
+  state.compareSeries = [...state.compareSeries, next];
+  await updateFlightSection(fsId);
 }
 
-function clearUavCompareSeries() {
-  uavCompareSeries = [];
-  uavSeriesRowCache.clear();
-  updateUavSection();
+function clearFlightCompareSeries(fsId) {
+  const state = fsState(fsId);
+  state.compareSeries = [];
+  state.seriesRowCache.clear();
+  syncFlightCompareMetricLock(fsId);
+  updateFlightSection(fsId);
 }
 
-function getUavCompareRows() {
-  if (!uavCompareSeries.length) return [];
-  return uavCompareSeries.flatMap(series => uavSeriesRowCache.get(uavSeriesKey(series)) || []);
+function getFlightCompareRows(fsId) {
+  const state = fsState(fsId);
+  if (!state.compareSeries.length) return [];
+  return state.compareSeries.flatMap(series => state.seriesRowCache.get(flightSeriesKey(series)) || []);
 }
 
-function formatUavCompareCount(count) {
-  if (!uavCompareSeries.length) return "";
-  const parts = uavCompareSeries.map(s => uavSeriesLabel(s));
-  return `${count.toLocaleString()} UAV row${count === 1 ? "" : "s"} · ${parts.join(" · ")}`;
+function formatFlightCompareCount(fsId, count) {
+  const state = fsState(fsId);
+  const cfg = fsCfg(fsId);
+  if (!state.compareSeries.length) return "";
+  const parts = state.compareSeries.map(s => flightSeriesLabel(s));
+  return `${count.toLocaleString()} ${cfg.rowLabel}${count === 1 ? "" : "s"} · ${parts.join(" · ")}`;
 }
 
-function getUavChartMetric() {
-  const field = getUavMetric();
-  return UAV_METRICS.find(m => m.field === field) || UAV_METRICS[0];
+function getFlightChartMetric(fsId) {
+  const cfg = fsCfg(fsId);
+  const field = getFlightMetric(fsId);
+  return cfg.metrics.find(m => m.field === field) || cfg.metrics[0];
 }
 
-function buildUavCompareChartGroups(metric) {
-  return uavCompareSeries.map((series, index) => {
-    const rows = uavSeriesRowCache.get(uavSeriesKey(series)) || [];
+function buildFlightCompareChartGroups(fsId, metric) {
+  const state = fsState(fsId);
+  return state.compareSeries.map((series, index) => {
+    const rows = state.seriesRowCache.get(flightSeriesKey(series)) || [];
     const points = rows.map((row, pointIndex) => ({
       y: parseMetricValue(row[metric.field]),
       label: row.site_treeid || `tree ${pointIndex + 1}`,
@@ -2196,7 +2658,7 @@ function buildUavCompareChartGroups(metric) {
     return {
       metric: {
         field: metric.field,
-        label: uavSeriesLabel(series),
+        label: flightSeriesLabel(series),
         color: COMPARE_COLORS[index % COMPARE_COLORS.length],
         decimals: 4,
       },
@@ -2207,45 +2669,88 @@ function buildUavCompareChartGroups(metric) {
   }).filter(Boolean).map((group, index) => ({ ...group, groupIndex: index }));
 }
 
-function updateUavCompareChart() {
-  destroyChart("uav");
-  if (!uavCompareSeries.length) return false;
-  const metric = getUavChartMetric();
-  const groups = buildUavCompareChartGroups(metric);
+function updateFlightCompareChart(fsId) {
+  destroyChart(fsId);
+  const state = fsState(fsId);
+  if (!state.compareSeries.length) return false;
+  const metric = getFlightChartMetric(fsId);
+  const groups = buildFlightCompareChartGroups(fsId, metric);
   if (!groups.length) return false;
-  const titleEl = document.getElementById("uav-chart-title");
+  const titleEl = fsEl(fsId, "chart-title");
   if (titleEl) {
     titleEl.textContent = groups.length === 1
-      ? `${metric.label} — ${uavSeriesFullLabel(uavCompareSeries[0])}`
+      ? `${metric.label} — ${flightSeriesFullLabel(state.compareSeries[0])}`
       : `${metric.label} — ${groups.length} series (sites / dates)`;
   }
-  const ctx = document.getElementById("uav-chart");
-  charts.uav = buildScatterBoxChartFromGroups(ctx, groups, {
+  charts[fsId] = buildBoxPlotChartFromGroups(fsEl(fsId, "chart"), groups, {
     xTitle: "Site · date",
     yTitle: metric.label,
   });
   return true;
 }
 
-async function loadUavMeta(force = false) {
-  if (!QUERY_BASE) return null;
-  const site = getUavSite();
-  if (!force && uavMeta && uavMetaSite === site) return uavMeta;
-  uavMeta = await queryJson(buildUavQuery("/uav/meta", { site }));
-  uavMetaSite = site;
-  return uavMeta;
+async function updateFlightRangeChart(fsId) {
+  destroyChart(fsId);
+  if (!QUERY_BASE || !isFlightRangeMode(fsId)) return false;
+  const cfg = fsCfg(fsId);
+  const { from, to } = getFlightDateRange(fsId);
+  const payload = await queryJson(buildQuery(`/${cfg.domain}/daily`, {
+    metric: getFlightMetric(fsId),
+    site: getFlightSite(fsId),
+    from,
+    to,
+  }));
+  const points = payload.points || [];
+  if (!points.length) return false;
+  const metricLabel = cfg.metrics.find(m => m.field === payload.metric)?.label || payload.metric;
+  fsEl(fsId, "chart-title").textContent = cfg.rangeChartTitle(getFlightSite(fsId), metricLabel);
+  charts[fsId] = new Chart(fsEl(fsId, "chart"), {
+    type: "line",
+    data: {
+      datasets: [{
+        label: metricLabel,
+        data: points.map(p => ({ x: p.date, y: p.mean })),
+        borderColor: "#336633",
+        backgroundColor: "rgba(51,102,51,0.1)",
+        tension: 0.2,
+        pointRadius: 2,
+        borderWidth: 1.5,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { type: "category", title: { display: true, text: "Flight date" } },
+        y: { title: { display: true, text: metricLabel } },
+      },
+    },
+  });
+  return true;
 }
 
-function populateUavFlightDateFilters({ reset = false, cascadeFrom = null } = {}) {
-  const yearSel = document.getElementById("uav-flt-year");
-  const monthSel = document.getElementById("uav-flt-month");
-  const daySel = document.getElementById("uav-flt-day");
-  const addBtn = document.getElementById("uav-add-series");
+async function loadFlightMeta(fsId, force = false) {
+  if (!QUERY_BASE) return null;
+  const cfg = fsCfg(fsId);
+  const site = getFlightSite(fsId);
+  const state = fsState(fsId);
+  if (!force && state.meta && state.metaSite === site) return state.meta;
+  state.meta = await queryJson(buildQuery(`/${cfg.domain}/meta`, { site }));
+  state.metaSite = site;
+  return state.meta;
+}
+
+function populateFlightDateFilters(fsId, { reset = false, cascadeFrom = null } = {}) {
+  const state = fsState(fsId);
+  const yearSel = fsEl(fsId, "flt-year");
+  const monthSel = fsEl(fsId, "flt-month");
+  const daySel = fsEl(fsId, "flt-day");
+  const addBtn = fsEl(fsId, "add-series");
   if (!yearSel || !monthSel || !daySel) return;
 
-  const dates = isUavRangeMode()
-    ? (uavMeta?.flight_dates || []).slice().sort()
-    : getAvailableUavCompareDates();
+  const dates = isFlightRangeMode(fsId)
+    ? (state.meta?.flight_dates || []).slice().sort()
+    : getAvailableFlightCompareDates(fsId);
   const prevYear = reset ? "" : yearSel.value;
   const prevMonth = reset || cascadeFrom === "year" ? "" : monthSel.value;
   const prevDay = reset || cascadeFrom === "year" || cascadeFrom === "month" ? "" : daySel.value;
@@ -2295,13 +2800,14 @@ function populateUavFlightDateFilters({ reset = false, cascadeFrom = null } = {}
     ? parseInt(prevDay, 10)
     : days[days.length - 1];
   daySel.value = String(dayNum);
-  if (addBtn) addBtn.disabled = uavCompareSeries.length >= COMPARE_MAX_SERIES;
+  if (addBtn) addBtn.disabled = state.compareSeries.length >= COMPARE_MAX_SERIES;
 }
 
-function syncUavDateInputs(reset = false) {
-  const fromInput = document.getElementById("uav-from-date");
-  const toInput = document.getElementById("uav-to-date");
-  const bounds = uavMeta?.bounds;
+function syncFlightDateInputs(fsId, reset = false) {
+  const state = fsState(fsId);
+  const fromInput = fsEl(fsId, "from-date");
+  const toInput = fsEl(fsId, "to-date");
+  const bounds = state.meta?.bounds;
   if (!bounds?.min_date || !fromInput || !toInput) {
     [fromInput, toInput].forEach(el => { if (el) { el.min = ""; el.max = ""; el.value = ""; } });
     return;
@@ -2317,233 +2823,255 @@ function syncUavDateInputs(reset = false) {
   }
 }
 
-function populateUavMetricFilter() {
-  populateMetricFilter("uav-metric", UAV_METRICS, "NDVI_mean");
+function populateFlightMetricFilter(fsId) {
+  const cfg = fsCfg(fsId);
+  populateMetricFilter(`${fsId}-metric`, cfg.metrics, cfg.defaultMetric);
 }
 
-async function updateUavChart() {
-  destroyChart("uav");
-  if (!QUERY_BASE || !isUavRangeMode()) return false;
-  const { from, to } = getUavDateRange();
-  const payload = await queryJson(buildUavQuery("/uav/daily", {
-    metric: getUavMetric(),
-    site: getUavSite(),
-    from,
-    to,
-  }));
-  const points = payload.points || [];
-  if (!points.length) return false;
-  const metricLabel = UAV_METRICS.find(m => m.field === payload.metric)?.label || payload.metric;
-  document.getElementById("uav-chart-title").textContent =
-    `UAV ${getUavSite()} — ${metricLabel}`;
-  const ctx = document.getElementById("uav-chart");
-  charts.uav = new Chart(ctx, {
-    type: "line",
-    data: {
-      datasets: [{
-        label: metricLabel,
-        data: points.map(p => ({ x: p.date, y: p.mean })),
-        borderColor: "#336633",
-        backgroundColor: "rgba(51,102,51,0.1)",
-        tension: 0.2,
-        pointRadius: 2,
-        borderWidth: 1.5,
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        x: { type: "category", title: { display: true, text: "Flight date" } },
-        y: { title: { display: true, text: metricLabel } },
-      },
-    },
-  });
-  return true;
-}
-
-function getUavTableColumns() {
-  return [
-    { title: "Site", field: "site", width: 70 },
-    { title: "Year", field: "year", width: 70 },
-    { title: "Flight date", field: "flight_date", minWidth: 110 },
-    { title: "Tree ID", field: "site_treeid", minWidth: 100 },
-    { title: "Confidence", field: "confidence", formatter: numFmt, minWidth: 90 },
-    { title: "NDVI", field: "NDVI_mean", formatter: numFmt },
-    { title: "GNDVI", field: "GNDVI_mean", formatter: numFmt },
-    { title: "PRI", field: "PRI_mean", formatter: numFmt },
-    { title: "NDRE", field: "NDRE_mean", formatter: numFmt },
-    { title: "CCI", field: "CCI_mean", formatter: numFmt },
-    { title: "NIRv", field: "NIRv_mean", formatter: numFmt },
-    { title: "Water index", field: "WaterIndex_mean", formatter: numFmt },
-  ];
-}
-
-function updateUavCountLabel() {
-  const { from, to } = getUavDateRange();
-  const uniqueDates = [...new Set(uavTableRows.map(r => r.flight_date).filter(Boolean))].sort();
-  document.getElementById("uav-range-label").textContent = uniqueDates.length
+function updateFlightCountLabel(fsId) {
+  const state = fsState(fsId);
+  const { from, to } = getFlightDateRange(fsId);
+  const uniqueDates = [...new Set(state.tableRows.map(r => r.flight_date).filter(Boolean))].sort();
+  fsEl(fsId, "range-label").textContent = uniqueDates.length
     ? `${uniqueDates.length} flight dates · ${uniqueDates[0]} to ${uniqueDates[uniqueDates.length - 1]}`
     : (from && to ? `${from} to ${to}` : "");
-  const trees = new Set(uavTableRows.map(r => r.site_treeid).filter(Boolean)).size;
-  document.getElementById("uav-count").textContent =
-    `${uavTableTotal.toLocaleString()} row${uavTableTotal === 1 ? "" : "s"} · ${trees.toLocaleString()} trees · ${uniqueDates.length} flight date${uniqueDates.length === 1 ? "" : "s"}`;
+  const trees = new Set(state.tableRows.map(r => r.site_treeid).filter(Boolean)).size;
+  let countText =
+    `${state.tableTotal.toLocaleString()} row${state.tableTotal === 1 ? "" : "s"} · ${trees.toLocaleString()} trees · ${uniqueDates.length} flight date${uniqueDates.length === 1 ? "" : "s"}`;
+  if (state.tableTruncated) {
+    countText += ` · showing first ${state.tableRows.length.toLocaleString()} rows (narrow the date range for the full table)`;
+  }
+  fsEl(fsId, "count").textContent = countText;
 }
 
-function refreshUavTable() {
-  const columns = getUavTableColumns();
-  if (uavTable) {
-    uavTable.setColumns(columns);
-    uavTable.setData(uavTableRows);
-    uavTable.setLayout("fitColumns");
-    uavTable.redraw(true);
-    return uavTable;
+function refreshFlightTable(fsId) {
+  const cfg = fsCfg(fsId);
+  const state = fsState(fsId);
+  const columns = cfg.getTableColumns();
+  if (state.table) {
+    state.table.setColumns(columns);
+    state.table.setData(state.tableRows);
+    state.table.redraw(true);
+    return state.table;
   }
-  uavTable = new Tabulator("#uav-table", {
+  state.table = new Tabulator(`#${fsId}-table`, {
     ...TABULATOR_TABLE_OPTS,
-    data: uavTableRows,
+    data: state.tableRows,
     pagination: true,
     paginationSize: 25,
     columns,
   });
-  return uavTable;
+  return state.table;
 }
 
-async function fetchAllUavRows() {
+async function fetchAllFlightRows(fsId) {
   if (!QUERY_BASE) return [];
-  const { from, to } = getUavDateRange();
-  const params = {
-    site: getUavSite(),
-    all: "true",
+  const cfg = fsCfg(fsId);
+  const state = fsState(fsId);
+  const { from, to } = getFlightDateRange(fsId);
+  const baseParams = {
+    site: getFlightSite(fsId),
   };
-  if (from) params.from = from;
-  if (to) params.to = to;
-  const payload = await queryJson(buildUavQuery("/uav/rows", params));
-  uavTableRows = payload.rows || [];
-  uavTableTotal = payload.total ?? uavTableRows.length;
-  return uavTableRows;
+  if (from) baseParams.from = from;
+  if (to) baseParams.to = to;
+
+  const probe = await queryJson(buildQuery(`/${cfg.domain}/rows`, {
+    ...baseParams,
+    page: 1,
+    page_size: 1,
+  }));
+  const total = probe.total ?? 0;
+  state.tableTotal = total;
+  state.tableTruncated = false;
+
+  if (total > FLIGHT_TABLE_MAX_ROWS) {
+    const preview = await queryJson(buildQuery(`/${cfg.domain}/rows`, {
+      ...baseParams,
+      page: 1,
+      page_size: FLIGHT_TABLE_PREVIEW_SIZE,
+    }));
+    state.tableRows = preview.rows || [];
+    state.tableTruncated = true;
+    return state.tableRows;
+  }
+
+  if (total > FLIGHT_TABLE_PREVIEW_SIZE) {
+    const payload = await queryJson(buildQuery(`/${cfg.domain}/rows`, {
+      ...baseParams,
+      all: "true",
+    }));
+    state.tableRows = payload.rows || [];
+    state.tableTotal = payload.total ?? state.tableRows.length;
+    return state.tableRows;
+  }
+
+  const payload = await queryJson(buildQuery(`/${cfg.domain}/rows`, {
+    ...baseParams,
+    page: 1,
+    page_size: Math.max(total, 1),
+  }));
+  state.tableRows = payload.rows || [];
+  state.tableTotal = payload.total ?? state.tableRows.length;
+  return state.tableRows;
 }
 
-async function updateUavRangeSection(requestId) {
-  await loadUavMeta();
-  if (requestId !== uavRequestId) return;
-  const site = getUavSite();
-  const siteChanged = lastUavSite !== site;
-  syncUavDateInputs(siteChanged);
-  lastUavSite = site;
-  const hasChart = await updateUavChart();
-  if (requestId !== uavRequestId) return;
-  setVisible("uav-series-chips", false);
-  setVisible("uav-compare-empty", false);
-  setVisible("uav-table", true);
-  setVisible("uav-table-footer", true);
-  document.getElementById("uav-count").textContent = "Loading all rows in selection…";
-  await fetchAllUavRows();
-  if (requestId !== uavRequestId) return;
-  refreshUavTable();
-  const hasRows = uavTableTotal > 0;
-  setVisible("uav-chart-box", hasChart);
-  setVisible("uav-range-label", true);
-  updateUavCountLabel();
+async function updateFlightRangeSection(fsId, requestId) {
+  const state = fsState(fsId);
+  await loadFlightMeta(fsId);
+  if (requestId !== state.requestId) return;
+  const site = getFlightSite(fsId);
+  const siteChanged = state.lastSite !== site;
+  syncFlightDateInputs(fsId, siteChanged);
+  state.lastSite = site;
+  const hasChart = await updateFlightRangeChart(fsId);
+  if (requestId !== state.requestId) return;
+  setVisible(`${fsId}-series-chips`, false);
+  setVisible(`${fsId}-compare-empty`, false);
+  setVisible(`${fsId}-table`, true);
+  setVisible(`${fsId}-table-footer`, true);
+  setVisible(`${fsId}-chart-box`, hasChart);
+  fsEl(fsId, "count").textContent = "Loading table rows…";
+  try {
+    await fetchAllFlightRows(fsId);
+    if (requestId !== state.requestId) return;
+    refreshFlightTable(fsId);
+    setVisible(`${fsId}-table`, state.tableRows.length > 0);
+    setVisible(`${fsId}-table-footer`, state.tableRows.length > 0);
+    setVisible(`${fsId}-range-label`, true);
+    updateFlightCountLabel(fsId);
+  } catch (err) {
+    if (requestId !== state.requestId) return;
+    console.error(err);
+    state.tableRows = [];
+    state.tableTotal = 0;
+    state.tableTruncated = false;
+    if (state.table) state.table.setData([]);
+    setVisible(`${fsId}-table`, false);
+    setVisible(`${fsId}-table-footer`, true);
+    setVisible(`${fsId}-range-label`, true);
+    fsEl(fsId, "count").textContent =
+      `Chart loaded · table unavailable: ${err.message}. Try a narrower date range or use Download full dataset (CSV).`;
+  }
 }
 
-async function updateUavCompareSection(requestId) {
-  await loadUavMeta();
-  if (requestId !== uavRequestId) return;
-  const site = getUavSite();
-  const siteChanged = lastUavSite !== site;
-  lastUavSite = site;
-  populateUavFlightDateFilters({ reset: siteChanged });
-  syncUavCompareMetricLock();
-  renderUavCompareSeriesChips();
+async function updateFlightCompareSection(fsId, requestId) {
+  const state = fsState(fsId);
+  const cfg = fsCfg(fsId);
+  await loadFlightMeta(fsId);
+  if (requestId !== state.requestId) return;
+  const site = getFlightSite(fsId);
+  const siteChanged = state.lastSite !== site;
+  state.lastSite = site;
+  populateFlightDateFilters(fsId, { reset: siteChanged });
+  syncFlightCompareMetricLock(fsId);
+  renderFlightCompareSeriesChips(fsId);
 
-  const hasSeries = uavCompareSeries.length > 0;
-  setVisible("uav-series-chips", true);
-  setVisible("uav-compare-empty", !hasSeries);
-  setVisible("uav-range-label", false);
-  setVisible("uav-table-footer", true);
+  const hasSeries = state.compareSeries.length > 0;
+  setVisible(`${fsId}-series-chips`, true);
+  setVisible(`${fsId}-compare-empty`, !hasSeries);
+  setVisible(`${fsId}-range-label`, false);
+  setVisible(`${fsId}-table-footer`, true);
 
   if (!hasSeries) {
-    destroyChart("uav");
-    setVisible("uav-chart-box", false);
-    setVisible("uav-count", false);
-    setVisible("uav-table", false);
-    document.getElementById("uav-count").textContent = "";
-    if (uavTable) uavTable.setData([]);
+    destroyChart(fsId);
+    setVisible(`${fsId}-chart-box`, false);
+    setVisible(`${fsId}-count`, false);
+    setVisible(`${fsId}-table`, false);
+    fsEl(fsId, "count").textContent = "";
+    if (state.table) state.table.setData([]);
     return;
   }
 
-  document.getElementById("uav-count").textContent = "Loading comparison data…";
-  await Promise.all(uavCompareSeries.map(series => fetchUavRowsForSeries(series)));
-  if (requestId !== uavRequestId) return;
+  fsEl(fsId, "count").textContent = "Loading comparison data…";
+  await Promise.all(state.compareSeries.map(series => fetchFlightRowsForSeries(fsId, series)));
+  if (requestId !== state.requestId) return;
 
-  const rows = getUavCompareRows();
+  const rows = getFlightCompareRows(fsId);
   const hasRows = rows.length > 0;
-  uavTableRows = rows;
-  uavTableTotal = rows.length;
-  setVisible("uav-count", hasRows);
-  setVisible("uav-table", hasRows);
-  setVisible("uav-chart-box", hasRows);
-  document.getElementById("uav-count").textContent = formatUavCompareCount(rows.length);
-  updateUavCompareChart();
-  uavTable = initMetricSubsetTable(uavTable, "#uav-table", getUavTableColumns, getUavCompareRows);
+  state.tableRows = rows;
+  state.tableTotal = rows.length;
+  setVisible(`${fsId}-count`, hasRows);
+  setVisible(`${fsId}-table`, hasRows);
+  setVisible(`${fsId}-chart-box`, hasRows);
+  fsEl(fsId, "count").textContent = formatFlightCompareCount(fsId, rows.length);
+  updateFlightCompareChart(fsId);
+  state.table = initMetricSubsetTable(
+    state.table,
+    `#${fsId}-table`,
+    () => cfg.getTableColumns(),
+    () => getFlightCompareRows(fsId)
+  );
 }
 
-async function updateUavSection() {
+async function updateFlightSection(fsId) {
   await ensureApiMode();
+  const cfg = fsCfg(fsId);
+  const state = fsState(fsId);
   if (!QUERY_BASE) {
-    document.getElementById("uav-count").textContent = "UAV data requires the FastAPI backend (port 8000 or ?api).";
-    setVisible("uav-chart-box", false);
-    setVisible("uav-range-label", false);
-    setVisible("uav-series-chips", false);
-    setVisible("uav-compare-empty", false);
-    setVisible("uav-table", false);
-    setVisible("uav-table-footer", false);
+    fsEl(fsId, "count").textContent = `${cfg.title} data requires the FastAPI backend (port 8000 or ?api).`;
+    setVisible(`${fsId}-chart-box`, false);
+    setVisible(`${fsId}-range-label`, false);
+    setVisible(`${fsId}-series-chips`, false);
+    setVisible(`${fsId}-compare-empty`, false);
+    setVisible(`${fsId}-table`, false);
+    setVisible(`${fsId}-table-footer`, false);
     return;
   }
-  const requestId = ++uavRequestId;
-  document.getElementById("uav-count").textContent = "Loading UAV data…";
-  setVisible("uav-count", true);
+  const requestId = ++state.requestId;
+  fsEl(fsId, "count").textContent = `Loading ${cfg.title} data…`;
+  setVisible(`${fsId}-count`, true);
   try {
-    if (isUavRangeMode()) {
-      await updateUavRangeSection(requestId);
+    if (isFlightRangeMode(fsId)) {
+      await updateFlightRangeSection(fsId, requestId);
     } else {
-      await updateUavCompareSection(requestId);
+      await updateFlightCompareSection(fsId, requestId);
     }
   } catch (err) {
-    if (requestId !== uavRequestId) return;
+    if (requestId !== state.requestId) return;
     console.error(err);
-    destroyChart("uav");
-    document.getElementById("uav-count").textContent = "UAV data unavailable: " + err.message;
-    setVisible("uav-chart-box", false);
-    setVisible("uav-range-label", false);
-    setVisible("uav-series-chips", false);
-    setVisible("uav-compare-empty", false);
-    setVisible("uav-table", false);
-    setVisible("uav-table-footer", false);
+    destroyChart(fsId);
+    fsEl(fsId, "count").textContent = `${cfg.title} data unavailable: ${err.message}`;
+    setVisible(`${fsId}-chart-box`, false);
+    setVisible(`${fsId}-range-label`, false);
+    setVisible(`${fsId}-series-chips`, false);
+    setVisible(`${fsId}-compare-empty`, false);
+    setVisible(`${fsId}-table`, false);
+    setVisible(`${fsId}-table-footer`, false);
   }
 }
 
-function downloadUavCsv() {
-  if (!uavTable) return;
-  if (isUavRangeMode()) {
-    const { from, to } = getUavDateRange();
+function downloadFlightCsv(fsId) {
+  const state = fsState(fsId);
+  if (!state.table) return;
+  if (isFlightRangeMode(fsId)) {
+    const { from, to } = getFlightDateRange(fsId);
     const range = from && to ? (from === to ? `_${from}` : `_${from}_to_${to}`) : "";
-    uavTable.download("csv", `uav_${getUavSite()}${range}.csv`);
+    state.table.download("csv", `${fsId}_${getFlightSite(fsId)}${range}.csv`);
     return;
   }
-  const parts = uavCompareSeries.map(s => `${s.year}_${s.site}_${s.date}`);
-  uavTable.download("csv", `uav_compare_${parts.join("__")}.csv`);
+  const parts = state.compareSeries.map(s => `${s.year}_${s.site}_${s.date}`);
+  state.table.download("csv", `${fsId}_compare_${parts.join("__")}.csv`);
 }
 
-function downloadUavFullCsv() {
-  Promise.all([2022, 2023].map(year =>
-    downloadSourceCsvFile(`uav_reflectance_${year}.csv`)
-  )).catch(err => {
+async function downloadFlightFullCsv(fsId) {
+  const cfg = fsCfg(fsId);
+  try {
+    await cfg.downloadFullCsv(getFlightSite(fsId));
+  } catch (err) {
     console.error(err);
-    alert("Could not download full UAV dataset.");
-  });
+    alert(`Could not download full ${cfg.title} dataset.`);
+  }
 }
+
+function updateUavSection() { return updateFlightSection("uav"); }
+function updateLidarSection() { return updateFlightSection("lidar"); }
+function updateGnssSection() { return updateFlightSection("gnss"); }
+function downloadUavCsv() { return downloadFlightCsv("uav"); }
+function downloadLidarCsv() { return downloadFlightCsv("lidar"); }
+function downloadGnssCsv() { return downloadFlightCsv("gnss"); }
+function downloadUavFullCsv() { return downloadFlightFullCsv("uav"); }
+function downloadLidarFullCsv() { return downloadFlightFullCsv("lidar"); }
+function downloadGnssFullCsv() { return downloadFlightFullCsv("gnss"); }
 
 function setVisible(id, visible) {
   const el = document.getElementById(id);
@@ -2704,33 +3232,54 @@ function updateVisibility() {
   const blank = !activeSensor && !!activeEntity;
   setVisible("blank-section", blank);
 
-  const hasWeather = activeSensor === "weather" && hasWeatherData();
+  const hasSoil = activeSensor === "soil_moisture" && hasSoilData();
   const hasFluor = activeSensor === "fluorescence" && hasFluorescenceData();
   const hasRefl = activeSensor === "reflectance" && hasReflectanceData();
   const hasWP = activeSensor === "wp" && hasWPData();
   const hasUav = activeSensor === "uav" && hasUavData();
+  const hasLidar = activeSensor === "lidar" && hasLidarData();
+  const hasGnss = activeSensor === "gnss" && hasGnssData();
+  const isFlightSensor = FLIGHT_SENSOR_IDS.includes(activeSensor);
 
-  setVisible("data-records-block", !blank && activeSensor !== "wp" && activeSensor !== "uav");
+  setVisible("data-records-block", !blank && activeSensor !== "wp" && !isFlightSensor);
   setVisible("sensor-controls", !blank);
-  setVisible("weather-section", hasWeather);
+  setVisible("weather-section", activeSensor === "weather");
+  setVisible("soil-section", hasSoil || activeSensor === "soil_moisture");
   setVisible("fluorescence-section", hasFluor);
   setVisible("reflectance-section", hasRefl);
+  setVisible("pigments-section", activeSensor === "pigments");
   setVisible("wp-section", hasWP);
   setVisible("uav-section", hasUav || activeSensor === "uav");
+  setVisible("lidar-section", hasLidar || activeSensor === "lidar");
+  setVisible("gnss-section", hasGnss || activeSensor === "gnss");
 
   setVisible("weather-controls-view", activeSensor === "weather");
   setVisible("weather-source-control", activeSensor === "weather");
   setVisible("weather-metric-control", activeSensor === "weather" && weatherDateMode !== "single");
-  setVisible("uav-site-control", activeSensor === "uav");
-  setVisible("uav-metric-control", activeSensor === "uav");
-  setVisible("uav-date-mode-control", activeSensor === "uav");
-  if (activeSensor === "uav") updateUavDateModeUI();
-  else {
-    setVisible("uav-filter-group", false);
-    setVisible("uav-compare-actions", false);
-    setVisible("uav-range-from", false);
-    setVisible("uav-range-to", false);
-  }
+  const hasSoilActive = activeSensor === "soil_moisture";
+  setVisible("soil-site-control", hasSoilActive);
+  setVisible("soil-sensor-control", hasSoilActive);
+  setVisible("soil-interval-control", hasSoilActive);
+  setVisible("soil-metric-control", hasSoilActive);
+  setVisible("soil-range-from", hasSoilActive);
+  setVisible("soil-range-to", hasSoilActive);
+  const hasPigmentsActive = activeSensor === "pigments";
+  setVisible("pigments-site-control", hasPigmentsActive);
+  setVisible("pigments-from-control", hasPigmentsActive);
+  setVisible("pigments-to-control", hasPigmentsActive);
+  FLIGHT_SENSOR_IDS.forEach(fsId => {
+    const active = activeSensor === fsId;
+    setVisible(`${fsId}-site-control`, active);
+    setVisible(`${fsId}-metric-control`, active);
+    setVisible(`${fsId}-date-mode-control`, active);
+    if (active) updateFlightDateModeUI(fsId);
+    else {
+      setVisible(`${fsId}-filter-group`, false);
+      setVisible(`${fsId}-compare-actions`, false);
+      setVisible(`${fsId}-range-from`, false);
+      setVisible(`${fsId}-range-to`, false);
+    }
+  });
   document.getElementById("sensor-controls").classList.toggle("weather-active", activeSensor === "weather");
   if (activeSensor === "weather") updateWeatherDateModeUI();
   ["fluor", "refl", "wp"].forEach(kind => {
@@ -2773,9 +3322,24 @@ function getWPRows() {
 async function updateWeatherSection() {
   if (!QUERY_BASE) {
     document.getElementById("weather-count").textContent = "Weather data requires the FastAPI backend (port 8000 or ?api).";
+    setVisible("weather-count", true);
+    setVisible("weather-single-view", false);
+    setVisible("weather-chart-box", false);
+    setVisible("weather-table", false);
+    setVisible("weather-table-footer", false);
+    setVisible("weather-range-label", false);
     return;
   }
   const requestId = ++weatherRequestId;
+  const loadingSingle = weatherDateMode === "single";
+  document.getElementById("weather-count").textContent = "Loading weather data…";
+  setVisible("weather-count", !loadingSingle);
+  if (loadingSingle) {
+    document.getElementById("weather-detail-title").textContent = "Loading…";
+    document.getElementById("weather-detail-rows").innerHTML =
+      '<p style="font-size:11pt;color:#999;">Loading weather data…</p>';
+    setVisible("weather-single-view", true);
+  }
   try {
     await loadWeatherMeta();
     syncWeatherDateInputs();
@@ -2784,24 +3348,36 @@ async function updateWeatherSection() {
     if (requestId !== weatherRequestId) return;
     console.error(err);
     document.getElementById("weather-count").textContent = "Weather data unavailable: " + err.message;
+    setVisible("weather-single-view", false);
+    setVisible("weather-chart-box", false);
+    setVisible("weather-table", false);
+    setVisible("weather-table-footer", false);
+    setVisible("weather-range-label", false);
     return;
   }
   if (requestId !== weatherRequestId) return;
   populateWeatherMetricFilter();
   const isSingle = weatherDateMode === "single";
   const rows = getWeatherRows();
-  const hasData = hasWeatherData() && rows.length > 0;
+  const hasData = rows.length > 0;
   setVisible("weather-single-view", isSingle && hasData);
-  setVisible("weather-chart-box", !isSingle && hasData && rows.length > 0);
+  setVisible("weather-chart-box", !isSingle && hasData);
   setVisible("weather-range-label", !isSingle && hasData);
   setVisible("weather-table", !isSingle && hasData);
   setVisible("weather-count", !isSingle && hasData);
   setVisible("weather-table-footer", !isSingle && hasData);
-  if (!hasData) return;
+  if (!hasData) {
+    destroyChart("weather");
+    document.getElementById("weather-count").textContent =
+      "No weather rows for the selected site, source, and dates.";
+    setVisible("weather-count", true);
+    return;
+  }
   const sourceLabel = getWeatherSource() === "daymet" ? "Daymet" : "ECCC";
   if (isSingle) {
     renderWeatherDetailPanel(rows);
     destroyChart("weather");
+    document.getElementById("weather-count").textContent = "";
   } else {
     document.getElementById("weather-count").textContent = formatWeatherDatasetCount(rows.length);
     const uniqueDates = [...new Set(rows.map(r => r.date))].sort();
@@ -2831,7 +3407,6 @@ function initWeatherTable(columns, getRows) {
   if (weatherTable) {
     weatherTable.setColumns(columns);
     weatherTable.setData(rows);
-    weatherTable.setLayout("fitColumns");
     weatherTable.redraw(true);
     return weatherTable;
   }
@@ -2969,7 +3544,6 @@ function initMetricSubsetTable(tableVar, selector, getColumns, getRows) {
   if (tableVar) {
     tableVar.setColumns(columns);
     tableVar.setData(rows);
-    tableVar.setLayout("fitColumns");
     tableVar.redraw(true);
     return tableVar;
   }
@@ -3333,6 +3907,92 @@ function buildScatterBoxChartFromGroups(ctx, groups, axisLabels = {}) {
   return chart;
 }
 
+function buildBoxPlotChartFromGroups(ctx, groups, axisLabels = {}) {
+  if (!groups.length) return null;
+
+  const yBounds = getNiceValueScaleBounds(
+    groups.flatMap(group => [group.stats.min, group.stats.max]),
+    0.1
+  );
+  const chart = new Chart(ctx, {
+    type: "scatter",
+    data: {
+      datasets: [{
+        label: "Summary",
+        data: groups.map(group => ({
+          x: group.groupIndex,
+          y: group.stats.median,
+          groupLabel: group.metric.label,
+          stats: group.stats,
+          decimals: group.metric.decimals ?? 3,
+        })),
+        pointRadius: 0,
+        pointHoverRadius: 10,
+        pointHitRadius: 18,
+        backgroundColor: "transparent",
+        borderColor: "transparent",
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          type: "linear",
+          min: -0.55,
+          max: groups.length - 0.45,
+          title: {
+            display: axisLabels.xTitle !== false,
+            text: typeof axisLabels.xTitle === "string" ? axisLabels.xTitle : "Group",
+            font: { size: 9 },
+          },
+          ticks: {
+            stepSize: 1,
+            font: { size: 9 },
+            callback(value) {
+              if (!Number.isInteger(value)) return "";
+              const group = this.chart.$scatterBoxGroups?.find(entry => entry.groupIndex === value);
+              return group ? group.metric.label : "";
+            },
+          },
+          grid: { drawOnChartArea: false },
+        },
+        y: {
+          beginAtZero: false,
+          min: yBounds.min,
+          max: yBounds.max,
+          title: { display: true, text: axisLabels.yTitle || "Value", font: { size: 9 } },
+          ticks: { font: { size: 9 } },
+        },
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title(items) {
+              return items[0]?.raw?.groupLabel || "";
+            },
+            label(context) {
+              const { stats, decimals } = context.raw;
+              return [
+                `n = ${stats.n}`,
+                `min: ${formatBoxValue(stats.min, decimals)}`,
+                `Q1: ${formatBoxValue(stats.q1, decimals)}`,
+                `median: ${formatBoxValue(stats.median, decimals)}`,
+                `Q3: ${formatBoxValue(stats.q3, decimals)}`,
+                `max: ${formatBoxValue(stats.max, decimals)}`,
+              ];
+            },
+          },
+        },
+      },
+    },
+    plugins: [scatterBoxOverlayPlugin],
+  });
+  chart.$scatterBoxGroups = groups;
+  return chart;
+}
+
 function hexToRgba(hex, alpha = 0.55) {
   const normalized = hex.replace("#", "");
   const full = normalized.length === 3
@@ -3485,14 +4145,461 @@ function updateWPCompareChart() {
   });
 }
 
+let pigmentsMeta = null;
+let pigmentsMetaKey = "";
+let pigmentsCampaigns = [];
+let pigmentsRequestId = 0;
+
+function getPigmentsSite() {
+  const value = document.getElementById("pigments-site")?.value || "all";
+  return value === "all" ? null : value;
+}
+
+function getPigmentsDateRange() {
+  return {
+    from: document.getElementById("pigments-from")?.value || "",
+    to: document.getElementById("pigments-to")?.value || "",
+  };
+}
+
+function toDatetimeLocalValue(dateStr, endOfDay = false) {
+  if (!dateStr) return "";
+  const day = String(dateStr).slice(0, 10);
+  return endOfDay ? `${day}T23:59` : `${day}T00:00`;
+}
+
+async function loadPigmentsMeta(force = false) {
+  if (!getPigmentsBase()) return null;
+  const site = getPigmentsSite();
+  const key = site || "all";
+  if (!force && pigmentsMeta && pigmentsMetaKey === key) return pigmentsMeta;
+  const params = {};
+  if (site) params.site = site;
+  pigmentsMeta = await pigmentsJson("/meta", params);
+  pigmentsMetaKey = key;
+  return pigmentsMeta;
+}
+
+function syncPigmentsDateInputs(reset = false) {
+  const fromInput = document.getElementById("pigments-from");
+  const toInput = document.getElementById("pigments-to");
+  const bounds = pigmentsMeta?.bounds;
+  if (!bounds?.min_date || !fromInput || !toInput) {
+    [fromInput, toInput].forEach(el => { if (el) el.value = ""; });
+    return;
+  }
+  const first = toDatetimeLocalValue(bounds.min_date, false);
+  const last = toDatetimeLocalValue(bounds.max_date, true);
+  [fromInput, toInput].forEach(el => {
+    if (!el) return;
+    el.min = first;
+    el.max = last;
+  });
+  if (reset || !fromInput.value) fromInput.value = first;
+  if (reset || !toInput.value) toInput.value = last;
+}
+
+function renderPigmentsCampaignList(campaigns) {
+  const list = document.getElementById("pigments-campaign-list");
+  if (!list) return;
+  if (!campaigns.length) {
+    list.innerHTML = '<li><span class="camp-meta">No campaigns overlap the selected range.</span></li>';
+    return;
+  }
+  list.innerHTML = campaigns.map(camp => `
+    <li>
+      <span class="camp-label">${camp.site} · ${camp.label}</span>
+      <div class="camp-meta">${camp.start_date}${camp.end_date !== camp.start_date ? ` – ${camp.end_date}` : ""} · ${camp.file_count.toLocaleString()} file${camp.file_count === 1 ? "" : "s"}</div>
+    </li>
+  `).join("");
+}
+
+function updatePigmentsCountLabel(campaigns) {
+  const { from, to } = getPigmentsDateRange();
+  const site = document.getElementById("pigments-site")?.value || "all";
+  const files = campaigns.reduce((sum, camp) => sum + (camp.file_count || 0), 0);
+  let text = `${campaigns.length} campaign folder${campaigns.length === 1 ? "" : "s"} · ${files.toLocaleString()} file${files === 1 ? "" : "s"}`;
+  if (from || to) text += ` · ${from || "…"} to ${to || "…"}`;
+  if (site !== "all") text += ` · ${site}`;
+  document.getElementById("pigments-count").textContent = text;
+}
+
+async function updatePigmentsSection() {
+  if (!getPigmentsBase()) {
+    document.getElementById("pigments-count").textContent =
+      "Pigments download requires the FastAPI backend (port 8000 or ?api).";
+    renderPigmentsCampaignList([]);
+    return;
+  }
+  const requestId = ++pigmentsRequestId;
+  document.getElementById("pigments-count").textContent = "Loading pigment campaigns…";
+  try {
+    await loadPigmentsMeta();
+    if (requestId !== pigmentsRequestId) return;
+    syncPigmentsDateInputs();
+    const { from, to } = getPigmentsDateRange();
+    const params = { from, to };
+    const site = getPigmentsSite();
+    if (site) params.site = site;
+    const payload = await pigmentsJson("/campaigns", params);
+    if (requestId !== pigmentsRequestId) return;
+    pigmentsCampaigns = payload.campaigns || [];
+    renderPigmentsCampaignList(pigmentsCampaigns);
+    updatePigmentsCountLabel(pigmentsCampaigns);
+  } catch (err) {
+    if (requestId !== pigmentsRequestId) return;
+    console.error(err);
+    document.getElementById("pigments-count").textContent = "Pigments data unavailable: " + err.message;
+    renderPigmentsCampaignList([]);
+  }
+}
+
+async function downloadPigmentsZip() {
+  const base = getPigmentsBase();
+  if (!base) {
+    alert("Pigments download requires the FastAPI backend (port 8000 or ?api).");
+    return;
+  }
+  const btn = document.getElementById("pigments-download-zip");
+  const { from, to } = getPigmentsDateRange();
+  if (!from || !to) {
+    alert("Choose both From and To dates.");
+    return;
+  }
+  const params = new URLSearchParams({ from, to });
+  const site = getPigmentsSite();
+  if (site) params.set("site", site);
+  const url = `${base}/download?${params.toString()}`;
+  const prevLabel = btn?.textContent;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Preparing ZIP…";
+  }
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(parseApiError(detail, response.status));
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get("Content-Disposition") || "";
+    const match = disposition.match(/filename=\"?([^\";]+)\"?/i);
+    const filename = match?.[1] || "pigments.zip";
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(objectUrl);
+  } catch (err) {
+    console.error(err);
+    alert("Could not download pigments ZIP: " + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = prevLabel || "Download data (ZIP)";
+    }
+  }
+}
+
+const SOIL_METRICS = [
+  { field: "vwc", label: "Volumetric water content (m³/m³)" },
+  { field: "st", label: "Soil temperature (°C)" },
+];
+const SOIL_TABLE_PREVIEW_SIZE = 500;
+const SOIL_TABLE_MAX_ROWS = 100_000;
+const SOIL_INTERVALS = [
+  { value: "hourly", label: "Hourly", axis: "Time" },
+  { value: "daily", label: "Daily", axis: "Date" },
+  { value: "weekly", label: "Weekly", axis: "Week" },
+  { value: "monthly", label: "Monthly", axis: "Month" },
+];
+
+function getSoilInterval() {
+  return document.getElementById("soil-interval")?.value || "daily";
+}
+
+function getSoilIntervalMeta(interval) {
+  return SOIL_INTERVALS.find(i => i.value === interval) || SOIL_INTERVALS[1];
+}
+
+let soilMeta = null;
+let soilMetaKey = "";
+let soilRequestId = 0;
+let soilTable = null;
+let soilTableRows = [];
+let soilTableTotal = 0;
+let soilTableTruncated = false;
+
+function getSoilSite() {
+  return document.getElementById("soil-site")?.value || "PIK";
+}
+
+function getSoilSensor() {
+  const sel = document.getElementById("soil-sensor");
+  if (sel?.value) return sel.value;
+  return soilMeta?.sensor_ids?.[0] || "";
+}
+
+function getSoilMetric() {
+  return document.getElementById("soil-metric")?.value || "vwc";
+}
+
+function getSoilDateRange() {
+  return {
+    from: document.getElementById("soil-from-date")?.value || "",
+    to: document.getElementById("soil-to-date")?.value || "",
+  };
+}
+
+function buildSoilQuery(path, params) {
+  const sensor = getSoilSensor();
+  if (!sensor) throw new Error("Select a soil sensor");
+  params.sensor_id = sensor;
+  return buildQuery(path, params);
+}
+
+async function loadSoilMeta(force = false) {
+  if (!QUERY_BASE) return null;
+  const site = getSoilSite();
+  const key = site;
+  if (!force && soilMeta && soilMetaKey === key) return soilMeta;
+  soilMeta = await queryJson(buildQuery("/soil_moisture/meta", { site }));
+  soilMetaKey = key;
+  return soilMeta;
+}
+
+function populateSoilMetricFilter() {
+  populateMetricFilter("soil-metric", SOIL_METRICS, "vwc");
+}
+
+function populateSoilSensorFilter() {
+  const sel = document.getElementById("soil-sensor");
+  if (!sel) return;
+  const current = sel.value;
+  const sensors = soilMeta?.sensor_ids || [];
+  sel.innerHTML = sensors.map(id => `<option value="${id}">${id}</option>`).join("");
+  if (sensors.includes(current)) sel.value = current;
+  else if (sensors.length) sel.value = sensors[0];
+}
+
+function syncSoilDateInputs(reset = false) {
+  const fromInput = document.getElementById("soil-from-date");
+  const toInput = document.getElementById("soil-to-date");
+  const bounds = soilMeta?.bounds;
+  if (!bounds?.min_date || !fromInput || !toInput) {
+    [fromInput, toInput].forEach(el => { if (el) { el.min = ""; el.max = ""; el.value = ""; } });
+    return;
+  }
+  const first = String(bounds.min_date).slice(0, 10);
+  const last = String(bounds.max_date).slice(0, 10);
+  [fromInput, toInput].forEach(el => { if (el) { el.min = first; el.max = last; } });
+  if (reset || !fromInput.value || fromInput.value < first || fromInput.value > last) {
+    fromInput.value = first;
+  }
+  if (reset || !toInput.value || toInput.value < first || toInput.value > last) {
+    toInput.value = last;
+  }
+}
+
+async function updateSoilChart() {
+  destroyChart("soil");
+  if (!QUERY_BASE) return false;
+  const sensor = getSoilSensor();
+  if (!sensor) return false;
+  const { from, to } = getSoilDateRange();
+  const metric = getSoilMetric();
+  const interval = getSoilInterval();
+  const intervalMeta = getSoilIntervalMeta(interval);
+  const payload = await queryJson(buildSoilQuery("/soil_moisture/daily", {
+    metric,
+    site: getSoilSite(),
+    interval,
+    from,
+    to,
+  }));
+  const points = payload.points || [];
+  if (!points.length) return false;
+  const metricLabel = SOIL_METRICS.find(m => m.field === payload.metric)?.label || payload.metric;
+  document.getElementById("soil-chart-title").textContent =
+    `Soil moisture ${getSoilSite()} (${sensor}) — ${metricLabel} — ${intervalMeta.label.toLowerCase()} means`;
+  charts.soil = new Chart(document.getElementById("soil-chart"), {
+    type: "line",
+    data: {
+      datasets: [{
+        label: metricLabel,
+        data: points.map(p => ({ x: p.date, y: p.mean })),
+        borderColor: "#336633",
+        backgroundColor: "rgba(51,102,51,0.1)",
+        tension: 0.2,
+        pointRadius: interval === "hourly" ? 0 : 2,
+        borderWidth: 1.5,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { type: "category", title: { display: true, text: intervalMeta.axis } },
+        y: { title: { display: true, text: metricLabel } },
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            afterLabel(ctx) {
+              const point = points[ctx.dataIndex];
+              return point ? `n = ${point.n} reading${point.n === 1 ? "" : "s"}` : "";
+            },
+          },
+        },
+      },
+    },
+  });
+  return true;
+}
+
+function getSoilTableColumns() {
+  return [
+    { title: "Site", field: "site", width: 70 },
+    { title: "Sensor", field: "sensor_id", width: 80 },
+    { title: "Date", field: "date", minWidth: 110 },
+    { title: "Time", field: "time", minWidth: 90 },
+    { title: "VWC", field: "vwc", formatter: numFmt },
+    { title: "Soil temp (°C)", field: "st", formatter: numFmt },
+    { title: "Elevation (m)", field: "elevation_m", formatter: numFmt },
+    { title: "Week", field: "week_label", minWidth: 70 },
+  ];
+}
+
+function refreshSoilTable() {
+  const columns = getSoilTableColumns();
+  if (soilTable) {
+    soilTable.setColumns(columns);
+    soilTable.setData(soilTableRows);
+    soilTable.redraw(true);
+    return soilTable;
+  }
+  soilTable = new Tabulator("#soil-table", {
+    ...TABULATOR_TABLE_OPTS,
+    data: soilTableRows,
+    pagination: true,
+    paginationSize: 25,
+    columns,
+  });
+  return soilTable;
+}
+
+async function fetchSoilRows() {
+  if (!QUERY_BASE) return [];
+  const { from, to } = getSoilDateRange();
+  const baseParams = { site: getSoilSite(), from, to };
+  const probe = await queryJson(buildSoilQuery("/soil_moisture/rows", {
+    ...baseParams,
+    page: 1,
+    page_size: 1,
+  }));
+  const total = probe.total ?? 0;
+  soilTableTotal = total;
+  soilTableTruncated = false;
+
+  if (total > SOIL_TABLE_MAX_ROWS) {
+    const preview = await queryJson(buildSoilQuery("/soil_moisture/rows", {
+      ...baseParams,
+      page: 1,
+      page_size: SOIL_TABLE_PREVIEW_SIZE,
+    }));
+    soilTableRows = preview.rows || [];
+    soilTableTruncated = true;
+    return soilTableRows;
+  }
+
+  const payload = await queryJson(buildSoilQuery("/soil_moisture/rows", {
+    ...baseParams,
+    all: "true",
+  }));
+  soilTableRows = payload.rows || [];
+  soilTableTotal = payload.total ?? soilTableRows.length;
+  return soilTableRows;
+}
+
+function updateSoilCountLabel() {
+  const { from, to } = getSoilDateRange();
+  const uniqueDates = [...new Set(soilTableRows.map(r => String(r.date).slice(0, 10)).filter(Boolean))].sort();
+  document.getElementById("soil-range-label").textContent = uniqueDates.length
+    ? `${uniqueDates.length} days · ${uniqueDates[0]} to ${uniqueDates[uniqueDates.length - 1]}`
+    : (from && to ? `${from} to ${to}` : "");
+  const sensor = getSoilSensor();
+  let text = `${soilTableTotal.toLocaleString()} reading${soilTableTotal === 1 ? "" : "s"} · sensor ${sensor || "—"}`;
+  if (soilTableTruncated) {
+    text += ` · showing first ${soilTableRows.length.toLocaleString()} rows (narrow the date range for the full table)`;
+  }
+  document.getElementById("soil-count").textContent = text;
+}
+
+async function updateSoilSection() {
+  if (!QUERY_BASE) {
+    document.getElementById("soil-count").textContent = "Soil moisture data requires the FastAPI backend (port 8000 or ?api).";
+    return;
+  }
+  const requestId = ++soilRequestId;
+  document.getElementById("soil-count").textContent = "Loading soil moisture data…";
+  try {
+    await loadSoilMeta();
+    if (requestId !== soilRequestId) return;
+    populateSoilSensorFilter();
+    syncSoilDateInputs();
+    const hasChart = await updateSoilChart();
+    if (requestId !== soilRequestId) return;
+    setVisible("soil-chart-box", hasChart);
+    await fetchSoilRows();
+    if (requestId !== soilRequestId) return;
+    refreshSoilTable();
+    const hasRows = soilTableRows.length > 0;
+    setVisible("soil-table", hasRows);
+    setVisible("soil-table-footer", hasRows);
+    setVisible("soil-range-label", hasRows || hasChart);
+    setVisible("soil-count", true);
+    updateSoilCountLabel();
+  } catch (err) {
+    if (requestId !== soilRequestId) return;
+    console.error(err);
+    destroyChart("soil");
+    document.getElementById("soil-count").textContent = "Soil moisture data unavailable: " + err.message;
+    setVisible("soil-chart-box", false);
+    setVisible("soil-table", false);
+    setVisible("soil-table-footer", false);
+    setVisible("soil-range-label", false);
+  }
+}
+
+function downloadSoilCsv() {
+  if (!soilTable) return;
+  const { from, to } = getSoilDateRange();
+  const range = from && to ? (from === to ? `_${from}` : `_${from}_to_${to}`) : "";
+  const sensor = getSoilSensor();
+  const sensorPart = sensor ? `_${sensor}` : "";
+  soilTable.download("csv", `soil_moisture_${getSoilSite()}${sensorPart}${range}.csv`);
+}
+
+function downloadSoilFullCsv() {
+  downloadSourceCsvFile("soil_moisture.csv").catch(err => {
+    console.error(err);
+    alert("Could not download full soil moisture dataset.");
+  });
+}
+
 async function refreshAll() {
   updateVisibility();
-  if (!QUERY_BASE) return;
   if (activeSensor === "weather") await updateWeatherSection();
+  if (activeSensor === "soil_moisture") await updateSoilSection();
+  if (activeSensor === "pigments") await updatePigmentsSection();
+  if (!QUERY_BASE) return;
   if (activeSensor === "fluorescence") await updateFluorescenceSection();
   if (activeSensor === "reflectance") await updateReflectanceSection();
   if (activeSensor === "wp") await updateWPSection();
   if (activeSensor === "uav") await updateUavSection();
+  if (activeSensor === "lidar") await updateLidarSection();
+  if (activeSensor === "gnss") await updateGnssSection();
 }
 
 function populateMetricFilter(selectId, metrics, defaultField, allowAll = false) {
@@ -3528,13 +4635,17 @@ function loadWeatherMetadata() {
     });
 }
 
-function onWeatherSourceChange() {
+async function onWeatherSourceChange() {
   weatherMeta = null;
   weatherMetaKey = "";
-  populateWeatherMetricFilter();
+  weatherRows = [];
   loadWeatherMetadata();
-  syncWeatherDateInputs(true);
-  refreshAll();
+  if (QUERY_BASE) {
+    await loadWeatherMeta();
+    syncWeatherDateInputs(true);
+  }
+  populateWeatherMetricFilter();
+  await updateWeatherSection();
 }
 
 function populateFluorescenceMetricFilter() {
@@ -3567,14 +4678,40 @@ async function bootDashboard() {
 
 Promise.resolve().then(bootDashboard).catch(err => console.error(err));
 
-document.getElementById("site-filter").addEventListener("change", () => {
+document.getElementById("site-filter").addEventListener("change", async () => {
   weatherMeta = null;
   weatherMetaKey = "";
-  if (activeSensor === "weather") syncWeatherDateInputs(true);
-  refreshAll();
+  if (activeSensor === "weather" && QUERY_BASE) {
+    await loadWeatherMeta();
+    syncWeatherDateInputs(true);
+  }
+  await refreshAll();
 });
 document.getElementById("weather-source").addEventListener("change", onWeatherSourceChange);
 document.getElementById("weather-metric").addEventListener("change", updateWeatherSection);
+["soil-site", "soil-sensor", "soil-interval", "soil-metric", "soil-from-date", "soil-to-date"].forEach(id => {
+  document.getElementById(id)?.addEventListener("change", () => {
+    if (activeSensor !== "soil_moisture") return;
+    if (id === "soil-site") {
+      soilMeta = null;
+      soilMetaKey = "";
+    }
+    updateSoilSection();
+  });
+});
+document.getElementById("soil-download-csv")?.addEventListener("click", downloadSoilCsv);
+document.getElementById("soil-download-full-csv")?.addEventListener("click", downloadSoilFullCsv);
+["pigments-site", "pigments-from", "pigments-to"].forEach(id => {
+  document.getElementById(id)?.addEventListener("change", () => {
+    if (activeSensor !== "pigments") return;
+    if (id === "pigments-site") {
+      pigmentsMeta = null;
+      pigmentsMetaKey = "";
+    }
+    updatePigmentsSection();
+  });
+});
+document.getElementById("pigments-download-zip")?.addEventListener("click", downloadPigmentsZip);
 document.getElementById("weather-download-csv").addEventListener("click", downloadWeatherCsv);
 document.getElementById("weather-download-full-csv").addEventListener("click", downloadWeatherFullCsv);
 document.getElementById("fluorescence-download-csv").addEventListener("click", downloadFluorescenceCsv);
@@ -3585,13 +4722,13 @@ document.getElementById("fluorescence-download-full-csv").addEventListener("clic
     else if (kind === "refl") updateReflectanceSection();
     else updateWPSection();
   };
-  document.getElementById(`${kind}-mode-toggle`)?.addEventListener("click", e => {
+  document.getElementById(`${kind}-mode-toggle`)?.addEventListener("click", async e => {
     const btn = e.target.closest("button[data-mode]");
-    if (!btn) return;
+    if (!btn || campaignDateMode[kind] === btn.dataset.mode) return;
     campaignDateMode[kind] = btn.dataset.mode;
     document.querySelectorAll(`#${kind}-mode-toggle button`).forEach(b => b.classList.toggle("active", b === btn));
     updateCampaignDateModeUI(kind);
-    if (isCampaignRangeMode(kind)) syncCampaignDateInputs(kind, true);
+    await resetCampaignFiltersForModeSwitch(kind);
     sectionRefresh();
   });
   document.getElementById(`${kind}-from-date`)?.addEventListener("change", () => {
@@ -3605,12 +4742,13 @@ document.getElementById("fluorescence-download-full-csv").addEventListener("clic
 });
 document.getElementById("reflectance-download-csv").addEventListener("click", downloadReflectanceCsv);
 document.getElementById("reflectance-download-full-csv").addEventListener("click", downloadReflectanceFullCsv);
-document.getElementById("weather-mode-toggle").addEventListener("click", e => {
+document.getElementById("weather-mode-toggle").addEventListener("click", async e => {
   const btn = e.target.closest("button[data-mode]");
-  if (!btn) return;
+  if (!btn || weatherDateMode === btn.dataset.mode) return;
   weatherDateMode = btn.dataset.mode;
   document.querySelectorAll("#weather-mode-toggle button").forEach(b => b.classList.toggle("active", b === btn));
   updateWeatherDateModeUI();
+  await resetWeatherFiltersForModeSwitch();
   updateWeatherSection();
 });
 document.getElementById("weather-date").addEventListener("change", updateWeatherSection);
@@ -3663,44 +4801,49 @@ COMPARE_KINDS.forEach(kind => {
 });
 document.getElementById("wp-download-csv").addEventListener("click", downloadWPCsv);
 document.getElementById("wp-download-full-csv").addEventListener("click", downloadWPFullCsv);
-document.getElementById("uav-mode-toggle")?.addEventListener("click", e => {
-  const btn = e.target.closest("button[data-mode]");
-  if (!btn) return;
-  uavDateMode = btn.dataset.mode;
-  document.querySelectorAll("#uav-mode-toggle button").forEach(b => b.classList.toggle("active", b === btn));
-  updateUavDateModeUI();
-  if (isUavRangeMode()) syncUavDateInputs(true);
-  if (activeSensor === "uav") updateUavSection();
-});
-document.getElementById("uav-add-series")?.addEventListener("click", () => addUavCompareSeries());
-document.getElementById("uav-clear-series")?.addEventListener("click", () => clearUavCompareSeries());
-document.getElementById("uav-site")?.addEventListener("change", () => {
-  if (activeSensor !== "uav") return;
-  uavMeta = null;
-  uavMetaSite = null;
-  if (isUavRangeMode()) syncUavDateInputs(true);
-  updateUavSection();
-});
-["uav-metric", "uav-from-date", "uav-to-date"].forEach(id => {
-  document.getElementById(id)?.addEventListener("change", () => {
-    if (activeSensor !== "uav") return;
-    if (!isUavRangeMode() && id === "uav-metric" && uavCompareSeries.length) {
-      updateUavCompareChart();
-      return;
-    }
-    updateUavSection();
+FLIGHT_SENSOR_IDS.forEach(fsId => {
+  document.getElementById(`${fsId}-mode-toggle`)?.addEventListener("click", async e => {
+    const btn = e.target.closest("button[data-mode]");
+    const state = fsState(fsId);
+    if (!btn || state.dateMode === btn.dataset.mode) return;
+    state.dateMode = btn.dataset.mode;
+    document.querySelectorAll(`#${fsId}-mode-toggle button`).forEach(b => b.classList.toggle("active", b === btn));
+    updateFlightDateModeUI(fsId);
+    await resetFlightFiltersForModeSwitch(fsId);
+    if (activeSensor === fsId) updateFlightSection(fsId);
   });
-});
-["uav-flt-year", "uav-flt-month", "uav-flt-day"].forEach(id => {
-  document.getElementById(id)?.addEventListener("change", () => {
-    if (activeSensor !== "uav" || isUavRangeMode()) return;
-    if (id === "uav-flt-year") populateUavFlightDateFilters({ cascadeFrom: "year" });
-    else if (id === "uav-flt-month") populateUavFlightDateFilters({ cascadeFrom: "month" });
-    syncUavCompareMetricLock();
+  document.getElementById(`${fsId}-add-series`)?.addEventListener("click", () => addFlightCompareSeries(fsId));
+  document.getElementById(`${fsId}-clear-series`)?.addEventListener("click", () => clearFlightCompareSeries(fsId));
+  document.getElementById(`${fsId}-site`)?.addEventListener("change", () => {
+    if (activeSensor !== fsId) return;
+    const state = fsState(fsId);
+    state.meta = null;
+    state.metaSite = null;
+    if (isFlightRangeMode(fsId)) syncFlightDateInputs(fsId, true);
+    updateFlightSection(fsId);
   });
+  [`${fsId}-metric`, `${fsId}-from-date`, `${fsId}-to-date`].forEach(id => {
+    document.getElementById(id)?.addEventListener("change", () => {
+      if (activeSensor !== fsId) return;
+      const state = fsState(fsId);
+      if (!isFlightRangeMode(fsId) && id === `${fsId}-metric` && state.compareSeries.length) {
+        updateFlightCompareChart(fsId);
+        return;
+      }
+      updateFlightSection(fsId);
+    });
+  });
+  [`${fsId}-flt-year`, `${fsId}-flt-month`, `${fsId}-flt-day`].forEach(id => {
+    document.getElementById(id)?.addEventListener("change", () => {
+      if (activeSensor !== fsId || isFlightRangeMode(fsId)) return;
+      if (id === `${fsId}-flt-year`) populateFlightDateFilters(fsId, { cascadeFrom: "year" });
+      else if (id === `${fsId}-flt-month`) populateFlightDateFilters(fsId, { cascadeFrom: "month" });
+      syncFlightCompareMetricLock(fsId);
+    });
+  });
+  document.getElementById(`${fsId}-download-csv`)?.addEventListener("click", () => downloadFlightCsv(fsId));
+  document.getElementById(`${fsId}-download-full-csv`)?.addEventListener("click", () => downloadFlightFullCsv(fsId));
 });
-document.getElementById("uav-download-csv")?.addEventListener("click", downloadUavCsv);
-document.getElementById("uav-download-full-csv")?.addEventListener("click", downloadUavFullCsv);
 
 document.getElementById("back-to-home").addEventListener("click", e => {
   e.preventDefault();

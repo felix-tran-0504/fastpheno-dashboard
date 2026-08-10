@@ -13,7 +13,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 
 from . import config
-from .routers import data_files, query
+from .routers import data_files, pigments, query
 from .services import parquet_store, query_engine
 
 
@@ -30,12 +30,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:8090",
-        "http://127.0.0.1:8090",
-        "http://localhost:8080",
-        "http://127.0.0.1:8080",
-    ],
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["GET"],
     allow_headers=["*"],
@@ -45,6 +40,7 @@ BLOCKED_STATIC_PREFIXES = ("data/fastpheno", "backend/")
 
 app.include_router(data_files.router)
 app.include_router(query.router)
+app.include_router(pigments.router)
 
 
 @app.get("/api/health")
