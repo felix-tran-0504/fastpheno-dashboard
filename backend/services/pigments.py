@@ -7,7 +7,7 @@ import os
 import re
 import tempfile
 import zipfile
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -144,6 +144,18 @@ def filter_campaigns(
     return filtered
 
 
+def _available_dates_for_campaigns(campaigns: list[dict[str, Any]]) -> list[str]:
+    days: set[date] = set()
+    for camp in campaigns:
+        start = date.fromisoformat(camp["start_date"])
+        end = date.fromisoformat(camp["end_date"])
+        current = start
+        while current <= end:
+            days.add(current)
+            current += timedelta(days=1)
+    return [day.isoformat() for day in sorted(days)]
+
+
 def get_meta(*, site: str | None = None) -> dict[str, Any]:
     campaigns = list_campaigns(site=site)
     if not campaigns:
@@ -152,6 +164,7 @@ def get_meta(*, site: str | None = None) -> dict[str, Any]:
             "source_root": str(config.PIGMENTS_ROOT),
             "sites": ["PIK", "PIN"],
             "campaigns": [],
+            "available_dates": [],
             "bounds": None,
         }
     starts = [c["start_date"] for c in campaigns]
@@ -161,6 +174,7 @@ def get_meta(*, site: str | None = None) -> dict[str, Any]:
         "source_root": str(config.PIGMENTS_ROOT),
         "sites": ["PIK", "PIN"],
         "campaigns": campaigns,
+        "available_dates": _available_dates_for_campaigns(campaigns),
         "bounds": {"min_date": min(starts), "max_date": max(ends)},
     }
 

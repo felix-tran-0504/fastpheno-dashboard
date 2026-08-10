@@ -5,8 +5,29 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data" / "fastpheno"
 PARQUET_DIR = DATA_DIR / "parquet"
 
-_DEFAULT_PIGMENTS_ROOT = Path("/Users/felixtran/Downloads/III_db_final/Pigments")
-PIGMENTS_ROOT = Path(os.environ.get("FASTPHENO_PIGMENTS_ROOT", _DEFAULT_PIGMENTS_ROOT)).expanduser()
+
+def _resolve_pigments_root() -> Path:
+    env_root = os.environ.get("FASTPHENO_PIGMENTS_ROOT")
+    candidates: list[Path] = []
+    if env_root:
+        candidates.append(Path(env_root).expanduser())
+    candidates.extend(
+        [
+            Path.home() / "III_db_final_local" / "keep" / "Pigments",
+            Path(r"C:\Users\riedelvi\III_db_final_local\keep\Pigments"),
+            Path.home() / "Downloads" / "III_db_final" / "Pigments",
+            Path(r"C:\Users\riedelvi\Downloads\III_db_final\Pigments"),
+        ]
+    )
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    if env_root:
+        return Path(env_root).expanduser()
+    return Path.home() / "III_db_final_local" / "keep" / "Pigments"
+
+
+PIGMENTS_ROOT = _resolve_pigments_root()
 
 # Max rows per paginated API response
 MAX_PAGE_SIZE = 500

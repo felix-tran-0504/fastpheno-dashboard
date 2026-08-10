@@ -597,18 +597,18 @@
       <div id="pigments-site-control" class="is-hidden">
         <label for="pigments-site">Site</label>
         <select id="pigments-site">
-          <option value="all">All sites</option>
+          <option value="all" selected>All sites</option>
           <option value="PIK">Pickering (PIK)</option>
-          <option value="PIN" selected>Pintendre (PIN)</option>
+          <option value="PIN">Pintendre (PIN)</option>
         </select>
       </div>
       <div id="pigments-from-control" class="is-hidden">
         <label for="pigments-from">From</label>
-        <input type="datetime-local" id="pigments-from">
+        <input type="date" id="pigments-from">
       </div>
       <div id="pigments-to-control" class="is-hidden">
         <label for="pigments-to">To</label>
-        <input type="datetime-local" id="pigments-to">
+        <input type="date" id="pigments-to">
       </div>
       </div>
     </div>
@@ -697,7 +697,6 @@
       <div class="pigments-actions data-table-footer">
         <button type="button" class="btn primary" id="pigments-download-zip">Download data (ZIP)</button>
       </div>
-      <div id="pigments-metadata" class="metadata-panel loading">Loading metadata…</div>
     </div>
   </div>
 
@@ -4162,10 +4161,9 @@ function getPigmentsDateRange() {
   };
 }
 
-function toDatetimeLocalValue(dateStr, endOfDay = false) {
+function toDateValue(dateStr) {
   if (!dateStr) return "";
-  const day = String(dateStr).slice(0, 10);
-  return endOfDay ? `${day}T23:59` : `${day}T00:00`;
+  return String(dateStr).slice(0, 10);
 }
 
 async function loadPigmentsMeta(force = false) {
@@ -4180,23 +4178,37 @@ async function loadPigmentsMeta(force = false) {
   return pigmentsMeta;
 }
 
+function getPigmentsAvailableDates() {
+  const dates = (pigmentsMeta?.available_dates || []).slice().sort();
+  if (dates.length) return dates;
+  const bounds = pigmentsMeta?.bounds;
+  if (!bounds?.min_date || !bounds?.max_date) return [];
+  return [toDateValue(bounds.min_date), toDateValue(bounds.max_date)];
+}
+
 function syncPigmentsDateInputs(reset = false) {
   const fromInput = document.getElementById("pigments-from");
   const toInput = document.getElementById("pigments-to");
+  const dates = getPigmentsAvailableDates();
   const bounds = pigmentsMeta?.bounds;
-  if (!bounds?.min_date || !fromInput || !toInput) {
-    [fromInput, toInput].forEach(el => { if (el) el.value = ""; });
+  if (!dates.length || !bounds?.min_date || !fromInput || !toInput) {
+    [fromInput, toInput].forEach(el => { if (el) { el.min = ""; el.max = ""; el.value = ""; } });
     return;
   }
-  const first = toDatetimeLocalValue(bounds.min_date, false);
-  const last = toDatetimeLocalValue(bounds.max_date, true);
+  const first = dates[0];
+  const last = dates[dates.length - 1];
   [fromInput, toInput].forEach(el => {
     if (!el) return;
     el.min = first;
     el.max = last;
   });
-  if (reset || !fromInput.value) fromInput.value = first;
-  if (reset || !toInput.value) toInput.value = last;
+  const defaultFrom = dates[Math.max(0, dates.length - 14)] || first;
+  if (reset || !fromInput.value || fromInput.value < first || fromInput.value > last) {
+    fromInput.value = defaultFrom;
+  }
+  if (reset || !toInput.value || toInput.value < first || toInput.value > last) {
+    toInput.value = last;
+  }
 }
 
 function renderPigmentsCampaignList(campaigns) {
