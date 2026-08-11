@@ -1,0 +1,29 @@
+Sync riedelvi@ffgg-fastpheno2.utm.utoronto.ca:/data/FastPheno/III_db_final
+  -> C:\Users\riedelvi\III_db_final_local
+Mode: selective (8 folder(s))
+  Weather, Fluorescence, Reflectance, UAV-Reflectance, UAV-SpatialInformation, SoilMoisture, PredawnWaterPotential, Pigments
+
+[Weather]
+  0 updated, 45 unchanged
+
+[Fluorescence]
+  0 updated, 10 unchanged
+
+[Reflectance]
+  0 updated, 31 unchanged
+
+[UAV-Reflectance]
+  0 updated, 75 unchanged
+
+[UAV-SpatialInformation]
+  0 updated, 384 unchanged
+Warning: remote folder not found, skipping: SoilMoisture
+
+[PredawnWaterPotential]
+  0 updated, 8 unchanged
+
+[Pigments]
+  0 updated, 348 unchanged
+
+Done: 0 file(s) updated, 901 unchanged skipped
+
