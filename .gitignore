@@ -3,7 +3,9 @@
 .cursor/debug-*.log
 .cursor/*.png
 backend/.env
+backend/auth.db
 logs/
+sync_run.log
 __pycache__/
 *.pyc
 data/fastpheno/parquet/
