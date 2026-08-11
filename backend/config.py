@@ -36,3 +36,8 @@ DEFAULT_PAGE_SIZE = 50
 UAV_MAX_TABLE_ROWS = 250_000
 CAMPAIGN_MAX_TABLE_ROWS = 50_000
 SOIL_MOISTURE_MAX_TABLE_ROWS = 350_000
+# CSV export: client-side JSON below this row count; server stream above (per domain defaults)
+CLIENT_EXPORT_MAX_ROWS = 50_000
+EXPORT_MAX_ROWS = 500_000
+# Domains that always use server-side Parquet → CSV streaming
+SERVER_EXPORT_DOMAINS = frozenset({"soil_moisture", "lidar", "gnss"})

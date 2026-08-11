@@ -2,8 +2,9 @@
 .cursor/node_modules/
 .cursor/debug-*.log
 .cursor/*.png
-backend/auth.db
 backend/.env
+logs/
 __pycache__/
 *.pyc
 data/fastpheno/parquet/
+data/fastpheno/*.csv

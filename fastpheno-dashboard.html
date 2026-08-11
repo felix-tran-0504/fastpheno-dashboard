@@ -2501,7 +2501,9 @@ const FLIGHT_SENSOR_CONFIG = {
     ],
     async downloadFullCsv(site) {
       const years = flightSensorState.uav.meta?.years || [2022, 2023];
-      await Promise.all(years.map(year => downloadSourceCsvFile(`uav_reflectance_${year}.csv`)));
+      for (const year of years) {
+        await downloadDomainExport("uav", { year }, null, `uav_reflectance_${year}.csv`);
+      }
     },
   },
   lidar: {
@@ -2523,9 +2525,14 @@ const FLIGHT_SENSOR_CONFIG = {
     ],
     async downloadFullCsv(site) {
       const years = flightSensorState.lidar.meta?.years || [];
-      await Promise.all(
-        years.map(year => downloadSourceCsvFile(`uav_lidar_${site.toLowerCase()}_${year}.csv`))
-      );
+      for (const year of years) {
+        await downloadDomainExport(
+          "lidar",
+          { site, year },
+          null,
+          `uav_lidar_${site.toLowerCase()}_${year}.csv`
+        );
+      }
     },
   },
   gnss: {
@@ -2548,9 +2555,14 @@ const FLIGHT_SENSOR_CONFIG = {
     ],
     async downloadFullCsv(site) {
       const years = flightSensorState.gnss.meta?.years || [];
-      await Promise.all(
-        years.map(year => downloadSourceCsvFile(`uav_gnss_${site.toLowerCase()}_${year}.csv`))
-      );
+      for (const year of years) {
+        await downloadDomainExport(
+          "gnss",
+          { site, year },
+          null,
+          `uav_gnss_${site.toLowerCase()}_${year}.csv`
+        );
+      }
     },
   },
 };
@@ -3570,6 +3582,10 @@ function downloadWPCsv() {
 
 function triggerCsvDownload(csvText, filename) {
   const blob = new Blob([csvText], { type: "text/csv;charset=utf-8;" });
+  triggerBlobDownload(blob, filename);
+}
+
+function triggerBlobDownload(blob, filename) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -3584,48 +3600,102 @@ function downloadRowsAsCsv(rows, fields, filename) {
   triggerCsvDownload(csv, filename);
 }
 
-async function downloadSourceCsvFile(filename) {
-  const response = await dataFetch(DATA_BASE + filename);
-  if (!response.ok) throw new Error(`Failed to download ${filename}`);
-  triggerCsvDownload(await response.text(), filename);
+const SERVER_EXPORT_DOMAINS = new Set(["soil_moisture", "lidar", "gnss"]);
+
+async function fetchExportMeta(domain, params = {}) {
+  const response = await dataFetch(buildQuery(`/${domain}/export/meta`, params));
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(parseApiError(detail, response.status));
+  }
+  return response.json();
+}
+
+async function downloadServerExportCsv(domain, params, filename) {
+  const response = await dataFetch(buildQuery(`/${domain}/export.csv`, params));
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(parseApiError(detail, response.status));
+  }
+  const blob = await response.blob();
+  triggerBlobDownload(blob, filename || `${domain}_export.csv`);
+}
+
+async function downloadClientExportCsv(domain, params, fields, filename) {
+  const payload = await queryJson(buildQuery(`/${domain}/rows`, { ...params, all: "true" }));
+  const rows = payload.rows || [];
+  if (!rows.length) throw new Error("No rows to export");
+  const columnFields = fields?.length
+    ? fields
+    : Object.keys(rows[0] || {});
+  downloadRowsAsCsv(rows, columnFields, filename);
+}
+
+async function downloadDomainExport(domain, params, fields, filename) {
+  if (!QUERY_BASE) throw new Error("Export requires the FastAPI backend");
+  const meta = await fetchExportMeta(domain, params);
+  const outName = filename || meta.filename;
+  if (meta.method === "server" || SERVER_EXPORT_DOMAINS.has(domain)) {
+    await downloadServerExportCsv(domain, params, outName);
+    return { method: "server", total: meta.total, filename: outName };
+  }
+  await downloadClientExportCsv(domain, params, fields, outName);
+  return { method: "client", total: meta.total, filename: outName };
 }
 
 async function downloadWeatherFullCsv() {
   const source = getWeatherSource();
   const resolution = getWeatherResolution();
   const site = getWeatherSite();
-  const params = { source, resolution, site, all: "true" };
+  const params = { source, resolution, site };
   try {
-    const payload = await queryJson(buildQuery("/weather/rows", params));
-    const rows = payload.rows || [];
-    if (!rows.length) return;
-    const fields = getWeatherTableColumns().map(col => col.field);
-    downloadRowsAsCsv(rows, fields, `weather_${source}_${site}_full.csv`);
+    await downloadDomainExport(
+      "weather",
+      params,
+      getWeatherTableColumns().map(col => col.field),
+      `weather_${source}_${site}_full.csv`
+    );
   } catch (err) {
     console.error(err);
     alert("Could not download full weather dataset.");
   }
 }
 
-function downloadFluorescenceFullCsv() {
-  downloadSourceCsvFile("fluorescence_indices.csv").catch(err => {
+async function downloadFluorescenceFullCsv() {
+  try {
+    await downloadDomainExport(
+      "fluorescence",
+      {},
+      fluorescenceFieldOrder.length ? fluorescenceFieldOrder : null,
+      "fluorescence_indices.csv"
+    );
+  } catch (err) {
     console.error(err);
     alert("Could not download full fluorescence dataset.");
-  });
+  }
 }
 
-function downloadReflectanceFullCsv() {
-  downloadSourceCsvFile("reflectance_indices.csv").catch(err => {
+async function downloadReflectanceFullCsv() {
+  try {
+    await downloadDomainExport(
+      "reflectance",
+      {},
+      reflectanceFieldOrder.length ? reflectanceFieldOrder : null,
+      "reflectance_indices.csv"
+    );
+  } catch (err) {
     console.error(err);
     alert("Could not download full reflectance dataset.");
-  });
+  }
 }
 
-function downloadWPFullCsv() {
-  downloadSourceCsvFile("predawn_wp_2023.csv").catch(err => {
+async function downloadWPFullCsv() {
+  try {
+    await downloadDomainExport("wp", {}, null, "predawn_wp_2023.csv");
+  } catch (err) {
     console.error(err);
     alert("Could not download full predawn water potential dataset.");
-  });
+  }
 }
 
 function initMetricSubsetTable(tableVar, selector, getColumns, getRows) {
@@ -4718,7 +4788,8 @@ function downloadSoilCsv() {
 }
 
 function downloadSoilFullCsv() {
-  downloadSourceCsvFile("soil_moisture.csv").catch(err => {
+  const site = getSoilSite();
+  downloadDomainExport("soil_moisture", { site }, null, `soil_moisture_${site.toLowerCase()}.csv`).catch(err => {
     console.error(err);
     alert("Could not download full soil moisture dataset.");
   });

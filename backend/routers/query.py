@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query
+import os
+import tempfile
+from pathlib import Path
+
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
+from fastapi.responses import FileResponse
 
 from ..services import datasets, query_engine
 
@@ -64,6 +69,82 @@ def domain_daily(
             date_from=date_from,
             date_to=date_to,
         )
+    except Exception as exc:
+        raise _http_error(exc) from exc
+
+
+@router.get("/{domain}/export.csv")
+def domain_export_csv(
+    background_tasks: BackgroundTasks,
+    domain: str,
+    source: str | None = Query(None, description="Weather source: eccc or daymet"),
+    resolution: str | None = Query(None, description="Weather resolution: daily or hourly (ECCC only)"),
+    site: str | None = Query(None, description="PIK or PIN"),
+    year: int | None = Query(None, description="UAV / spatial year"),
+    date_from: str | None = Query(None, alias="from"),
+    date_to: str | None = Query(None, alias="to"),
+    sensor_id: str | None = Query(None, description="Soil moisture sensor ID (e.g. b11)"),
+):
+    try:
+        spec = query_engine.prepare_export(
+            domain,
+            source=source,
+            resolution=resolution,
+            site=site,
+            year=year,
+            date_from=date_from,
+            date_to=date_to,
+            sensor_id=sensor_id,
+        )
+        tmp_fd, tmp_name = tempfile.mkstemp(suffix=".csv")
+        os.close(tmp_fd)
+        tmp = Path(tmp_name)
+        query_engine.write_export_csv(spec, tmp)
+
+        def _cleanup(path: Path) -> None:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+
+        background_tasks.add_task(_cleanup, tmp)
+        return FileResponse(
+            tmp,
+            media_type="text/csv",
+            filename=spec.filename,
+        )
+    except Exception as exc:
+        raise _http_error(exc) from exc
+
+
+@router.get("/{domain}/export/meta")
+def domain_export_meta(
+    domain: str,
+    source: str | None = Query(None, description="Weather source: eccc or daymet"),
+    resolution: str | None = Query(None, description="Weather resolution: daily or hourly (ECCC only)"),
+    site: str | None = Query(None, description="PIK or PIN"),
+    year: int | None = Query(None, description="UAV / spatial year"),
+    date_from: str | None = Query(None, alias="from"),
+    date_to: str | None = Query(None, alias="to"),
+    sensor_id: str | None = Query(None, description="Soil moisture sensor ID (e.g. b11)"),
+):
+    try:
+        spec = query_engine.prepare_export(
+            domain,
+            source=source,
+            resolution=resolution,
+            site=site,
+            year=year,
+            date_from=date_from,
+            date_to=date_to,
+            sensor_id=sensor_id,
+        )
+        return {
+            "domain": domain,
+            "total": spec.total,
+            "filename": spec.filename,
+            "method": "server" if spec.use_server else "client",
+        }
     except Exception as exc:
         raise _http_error(exc) from exc
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -1020,3 +1021,138 @@ def get_rows(
         "year": year,
         "sensor_id": sensor_id,
     }
+
+
+@dataclass(frozen=True)
+class ExportSpec:
+    select_sql: str
+    params: list[Any]
+    total: int
+    filename: str
+    use_server: bool
+
+
+def _export_filename(
+    domain: str,
+    *,
+    source: str | None = None,
+    site: str | None = None,
+    year: int | None = None,
+    sensor_id: str | None = None,
+) -> str:
+    if domain == "fluorescence":
+        return "fluorescence_indices.csv"
+    if domain == "reflectance":
+        return "reflectance_indices.csv"
+    if domain == "wp":
+        return "predawn_wp_2023.csv"
+    if domain == "soil_moisture":
+        parts = ["soil_moisture"]
+        if site:
+            parts.append(site.lower())
+        if sensor_id:
+            parts.append(str(sensor_id))
+        return "_".join(parts) + ".csv"
+    if domain == "uav":
+        return f"uav_reflectance_{year}.csv" if year else "uav_reflectance_all.csv"
+    if domain in SPATIAL_DOMAINS:
+        site_slug = (site or "all").lower()
+        if year:
+            return f"uav_{domain}_{site_slug}_{year}.csv"
+        return f"uav_{domain}_{site_slug}_all.csv"
+    if domain == "weather":
+        src = (source or "eccc").lower()
+        site_slug = (site or "all").lower()
+        return f"weather_{src}_{site_slug}.csv"
+    return f"{domain}_export.csv"
+
+
+def recommend_export_method(domain: str, total: int) -> str:
+    if domain in config.SERVER_EXPORT_DOMAINS:
+        return "server"
+    if total > config.CLIENT_EXPORT_MAX_ROWS:
+        return "server"
+    return "client"
+
+
+def prepare_export(
+    domain: str,
+    *,
+    source: str | None = None,
+    resolution: str | None = None,
+    site: str | None = None,
+    year: int | None = None,
+    sensor_id: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+) -> ExportSpec:
+    """Build a full-dataset export query over Parquet (no pagination)."""
+    cfg = datasets.domain_config(domain)
+    date_from = _validate_date(date_from, "from")
+    date_to = _validate_date(date_to, "to")
+    filename = _export_filename(domain, source=source, site=site, year=year, sensor_id=sensor_id)
+
+    if domain == "weather":
+        site = _validate_weather_site(site)
+        if not source:
+            raise ValueError("source is required")
+        resolved = _resolve_weather_source(source, resolution)
+        relation = _weather_relation(resolved, site)
+        where, params = _build_filters(cfg.date_field, cfg.site_field, site=None, date_from=date_from, date_to=date_to)
+        order_by = f"{cfg.date_field}, time" if resolved == "eccc_hourly" else cfg.date_field
+        select_list = "*"
+    elif domain == "uav":
+        years = [year] if year is not None else _uav_years_in_range(date_from, date_to)
+        relation = _uav_relation(years)
+        site = _validate_site(site)
+        where, params = _build_filters(cfg.date_field, cfg.site_field, site=site, date_from=date_from, date_to=date_to)
+        select_list = _uav_select_columns()
+        order_by = f"{cfg.date_field}, site_treeid"
+    elif domain in SPATIAL_DOMAINS:
+        site = _validate_site(site) or "PIN"
+        if year is not None:
+            years = [year]
+        else:
+            years = _spatial_years_for_site(domain, site, date_from, date_to)
+        relation = _spatial_relation(domain, site, years)
+        where, params = _build_filters(cfg.date_field, cfg.site_field, site=site, date_from=date_from, date_to=date_to)
+        select_list = _spatial_select_columns(domain)
+        order_by = f"{cfg.date_field}, site_treeid"
+        if year is not None:
+            filename = _export_filename(domain, site=site, year=year)
+    elif domain in datasets.TABLE_DOMAINS:
+        site = _validate_site(site)
+        if domain == "soil_moisture":
+            sensor_id = sensor_id if sensor_id else None
+            if sensor_id:
+                sensor_id = _validate_soil_sensor_id(sensor_id)
+        relation = _table_relation(domain)
+        extra = _filter_extra(domain, sensor_id)
+        where, params = _build_filters(
+            cfg.date_field, cfg.site_field, site=site, date_from=date_from, date_to=date_to, extra=extra
+        )
+        select_list = "*"
+        order_by = f"{cfg.date_field}, sensor_id, time" if domain == "soil_moisture" else cfg.date_field
+    else:
+        raise KeyError(domain)
+
+    total_row = _fetch_one(f"SELECT count(*) AS total FROM {relation}{where}", params)
+    total = int(total_row["total"]) if total_row else 0
+    if total > config.EXPORT_MAX_ROWS:
+        raise ValueError(f"too many rows ({total}); narrow filters (max export {config.EXPORT_MAX_ROWS})")
+
+    select_sql = f"SELECT {select_list} FROM {relation}{where} ORDER BY {order_by}"
+    use_server = recommend_export_method(domain, total) == "server"
+    return ExportSpec(select_sql=select_sql, params=params, total=total, filename=filename, use_server=use_server)
+
+
+def write_export_csv(spec: ExportSpec, dest: Path) -> Path:
+    """Run export query and write CSV with header to dest."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest_sql = str(dest.resolve()).replace("'", "''")
+    con = _connection()
+    con.execute(
+        f"COPY ({spec.select_sql}) TO '{dest_sql}' (HEADER, DELIMITER ',')",
+        spec.params,
+    )
+    return dest
